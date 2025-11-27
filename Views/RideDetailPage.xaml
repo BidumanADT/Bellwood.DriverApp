@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:Bellwood.DriverApp.ViewModels"
+             x:Class="Bellwood.DriverApp.Views.RideDetailPage"
+             x:DataType="viewmodels:RideDetailViewModel"
+             Title="{Binding Title}">
+
+    <ScrollView>
+        <VerticalStackLayout Spacing="0" Padding="0">
+
+            <!-- Header Card -->
+            <Frame Margin="0" 
+                   Padding="20" 
+                   BackgroundColor="{StaticResource Primary}"
+                   CornerRadius="0"
+                   HasShadow="False">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="{Binding Ride.PassengerName}"
+                           FontSize="24"
+                           FontAttributes="Bold"
+                           TextColor="White"/>
+                    <Label Text="{Binding Ride.PickupDateTime, StringFormat='Pick up: {0:MMM dd, yyyy h:mm tt}'}"
+                           FontSize="16"
+                           TextColor="White"/>
+                    <Label Text="{Binding Ride.Status}"
+                           FontSize="18"
+                           FontAttributes="Bold"
+                           TextColor="White"
+                           Margin="0,5,0,0"/>
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Location Tracking Indicator -->
+            <Frame IsVisible="{Binding IsTracking}"
+                   BackgroundColor="{StaticResource Success}"
+                   Margin="10"
+                   Padding="10"
+                   CornerRadius="8"
+                   HasShadow="False">
+                <HorizontalStackLayout Spacing="10">
+                    <Label Text="??" FontSize="16"/>
+                    <Label Text="Location tracking active"
+                           TextColor="White"
+                           FontAttributes="Bold"/>
+                </HorizontalStackLayout>
+            </Frame>
+
+            <!-- Contact Info -->
+            <Frame Margin="10" Padding="15" BackgroundColor="White" CornerRadius="8">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Contact Information"
+                           FontSize="18"
+                           FontAttributes="Bold"/>
+                    
+                    <HorizontalStackLayout Spacing="10">
+                        <Label Text="??" FontSize="16"/>
+                        <Label Text="{Binding Ride.PassengerPhone}"
+                               FontSize="16"
+                               TextColor="{StaticResource Gray700}"/>
+                    </HorizontalStackLayout>
+
+                    <Button Text="Call Passenger"
+                            Command="{Binding CallPassengerCommand}"
+                            BackgroundColor="{StaticResource Success}"
+                            TextColor="White"
+                            CornerRadius="8"/>
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Locations -->
+            <Frame Margin="10" Padding="15" BackgroundColor="White" CornerRadius="8">
+                <VerticalStackLayout Spacing="15">
+                    <Label Text="Locations"
+                           FontSize="18"
+                           FontAttributes="Bold"/>
+
+                    <!-- Pickup -->
+                    <VerticalStackLayout Spacing="5">
+                        <Label Text="Pick Up" 
+                               FontSize="14" 
+                               TextColor="{StaticResource Gray500}"
+                               FontAttributes="Bold"/>
+                        <Label Text="{Binding Ride.PickupLocation}"
+                               FontSize="16"/>
+                        <Label Text="{Binding Ride.PickupStyle}"
+                               FontSize="14"
+                               TextColor="{StaticResource Gray600}"
+                               IsVisible="{Binding Ride.PickupStyle, Converter={StaticResource IsNotNullConverter}}"/>
+                        <Label Text="{Binding Ride.PickupSignText, StringFormat='Sign: {0}'}"
+                               FontSize="14"
+                               TextColor="{StaticResource Gray600}"
+                               IsVisible="{Binding Ride.PickupSignText, Converter={StaticResource IsNotNullConverter}}"/>
+                        <Button Text="Navigate to Pick Up"
+                                Command="{Binding NavigateToPickupCommand}"
+                                BackgroundColor="{StaticResource Primary}"
+                                TextColor="White"
+                                CornerRadius="8"
+                                Margin="0,5,0,0"/>
+                    </VerticalStackLayout>
+
+                    <!-- Dropoff -->
+                    <VerticalStackLayout Spacing="5">
+                        <Label Text="Drop Off" 
+                               FontSize="14" 
+                               TextColor="{StaticResource Gray500}"
+                               FontAttributes="Bold"/>
+                        <Label Text="{Binding Ride.DropoffLocation}"
+                               FontSize="16"/>
+                        <Button Text="Navigate to Drop Off"
+                                Command="{Binding NavigateToDropoffCommand}"
+                                BackgroundColor="{StaticResource Primary}"
+                                TextColor="White"
+                                CornerRadius="8"
+                                Margin="0,5,0,0"/>
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Ride Details -->
+            <Frame Margin="10" Padding="15" BackgroundColor="White" CornerRadius="8">
+                <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" 
+                      ColumnDefinitions="*,*"
+                      RowSpacing="10"
+                      ColumnSpacing="10">
+
+                    <Label Grid.Row="0" Grid.ColumnSpan="2"
+                           Text="Ride Details"
+                           FontSize="18"
+                           FontAttributes="Bold"/>
+
+                    <Label Grid.Row="1" Grid.Column="0"
+                           Text="{Binding Ride.PassengerCount, StringFormat='?? {0} passengers'}"/>
+                    <Label Grid.Row="1" Grid.Column="1"
+                           Text="{Binding Ride.VehicleClass, StringFormat='?? {0}'}"/>
+
+                    <Label Grid.Row="2" Grid.Column="0"
+                           Text="{Binding Ride.CheckedBags, StringFormat='?? {0} checked'}"/>
+                    <Label Grid.Row="2" Grid.Column="1"
+                           Text="{Binding Ride.CarryOnBags, StringFormat='?? {0} carry-on'}"/>
+
+                    <Label Grid.Row="3" Grid.ColumnSpan="2"
+                           Text="{Binding Ride.OutboundFlight.FlightNumber, StringFormat='?? Flight: {0}'}"
+                           IsVisible="{Binding Ride.OutboundFlight.FlightNumber, Converter={StaticResource IsNotNullConverter}}"/>
+
+                    <Label Grid.Row="4" Grid.ColumnSpan="2"
+                           Text="{Binding Ride.AdditionalRequest, StringFormat='?? Note: {0}'}"
+                           IsVisible="{Binding Ride.AdditionalRequest, Converter={StaticResource IsNotNullConverter}}"
+                           TextColor="{StaticResource Warning}"/>
+                </Grid>
+            </Frame>
+
+            <!-- Status Update Buttons -->
+            <Frame Margin="10" Padding="15" BackgroundColor="White" CornerRadius="8">
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Update Ride Status"
+                           FontSize="18"
+                           FontAttributes="Bold"/>
+
+                    <Button Text="Start Trip (On Route)"
+                            Command="{Binding UpdateStatusCommand}"
+                            CommandParameter="OnRoute"
+                            IsVisible="{Binding CanTransitionToOnRoute}"
+                            BackgroundColor="{StaticResource Primary}"
+                            TextColor="White"
+                            CornerRadius="8"/>
+
+                    <Button Text="Mark Arrived"
+                            Command="{Binding UpdateStatusCommand}"
+                            CommandParameter="Arrived"
+                            IsVisible="{Binding CanTransitionToArrived}"
+                            BackgroundColor="{StaticResource Info}"
+                            TextColor="White"
+                            CornerRadius="8"/>
+
+                    <Button Text="Passenger Onboard"
+                            Command="{Binding UpdateStatusCommand}"
+                            CommandParameter="PassengerOnboard"
+                            IsVisible="{Binding CanTransitionToPassengerOnboard}"
+                            BackgroundColor="{StaticResource Success}"
+                            TextColor="White"
+                            CornerRadius="8"/>
+
+                    <Button Text="Complete Ride"
+                            Command="{Binding UpdateStatusCommand}"
+                            CommandParameter="Completed"
+                            IsVisible="{Binding CanTransitionToCompleted}"
+                            BackgroundColor="{StaticResource Success}"
+                            TextColor="White"
+                            CornerRadius="8"/>
+
+                    <Button Text="Cancel Ride"
+                            Command="{Binding UpdateStatusCommand}"
+                            CommandParameter="Cancelled"
+                            IsVisible="{Binding CanCancel}"
+                            BackgroundColor="{StaticResource Danger}"
+                            TextColor="White"
+                            CornerRadius="8"/>
+                </VerticalStackLayout>
+            </Frame>
+
+            <!-- Error Message -->
+            <Label Text="{Binding ErrorMessage}"
+                   TextColor="{StaticResource Danger}"
+                   FontSize="14"
+                   IsVisible="{Binding ErrorMessage, Converter={StaticResource IsNotNullConverter}}"
+                   Margin="20,10"
+                   HorizontalOptions="Center"/>
+
+            <!-- Loading Overlay -->
+            <ActivityIndicator IsRunning="{Binding IsBusy}"
+                              IsVisible="{Binding IsBusy}"
+                              Color="{StaticResource Primary}"
+                              Margin="20"/>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>
