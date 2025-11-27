@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:Bellwood.DriverApp.ViewModels"
+             x:Class="Bellwood.DriverApp.Views.LoginPage"
+             x:DataType="viewmodels:LoginViewModel"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="{StaticResource Gray100}">
+
+    <ScrollView>
+        <VerticalStackLayout Spacing="20" Padding="30" VerticalOptions="Center">
+            
+            <!-- Logo/Title -->
+            <Label Text="Bellwood Driver"
+                   FontSize="32"
+                   FontAttributes="Bold"
+                   HorizontalOptions="Center"
+                   TextColor="{StaticResource Primary}"
+                   Margin="0,0,0,30"/>
+
+            <!-- Username Entry -->
+            <Frame BorderColor="{StaticResource Gray300}" 
+                   CornerRadius="8" 
+                   Padding="0"
+                   HasShadow="False">
+                <Entry Placeholder="Username"
+                       Text="{Binding Username}"
+                       ReturnType="Next"
+                       Margin="10,5"/>
+            </Frame>
+
+            <!-- Password Entry -->
+            <Frame BorderColor="{StaticResource Gray300}" 
+                   CornerRadius="8" 
+                   Padding="0"
+                   HasShadow="False">
+                <Entry Placeholder="Password"
+                       Text="{Binding Password}"
+                       IsPassword="True"
+                       ReturnType="Done"
+                       ReturnCommand="{Binding LoginCommand}"
+                       Margin="10,5"/>
+            </Frame>
+
+            <!-- Error Message -->
+            <Label Text="{Binding ErrorMessage}"
+                   TextColor="{StaticResource Danger}"
+                   FontSize="14"
+                   IsVisible="{Binding ErrorMessage, Converter={StaticResource IsNotNullConverter}}"
+                   HorizontalOptions="Center"/>
+
+            <!-- Login Button -->
+            <Button Text="Sign In"
+                    Command="{Binding LoginCommand}"
+                    IsEnabled="{Binding IsBusy, Converter={StaticResource InvertedBoolConverter}}"
+                    BackgroundColor="{StaticResource Primary}"
+                    TextColor="White"
+                    FontAttributes="Bold"
+                    HeightRequest="50"
+                    CornerRadius="8"
+                    Margin="0,10,0,0"/>
+
+            <!-- Loading Indicator -->
+            <ActivityIndicator IsRunning="{Binding IsBusy}"
+                              IsVisible="{Binding IsBusy}"
+                              Color="{StaticResource Primary}"
+                              HorizontalOptions="Center"/>
+
+            <!-- App Version -->
+            <Label Text="Version 1.0"
+                   FontSize="12"
+                   TextColor="{StaticResource Gray500}"
+                   HorizontalOptions="Center"
+                   Margin="0,40,0,0"/>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

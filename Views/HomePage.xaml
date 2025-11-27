@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:viewmodels="clr-namespace:Bellwood.DriverApp.ViewModels"
+             xmlns:models="clr-namespace:Bellwood.DriverApp.Models"
+             x:Class="Bellwood.DriverApp.Views.HomePage"
+             x:DataType="viewmodels:HomeViewModel"
+             Title="{Binding Title}">
+
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="Sign Out" 
+                     Command="{Binding SignOutCommand}"
+                     IconImageSource="logout.png"/>
+    </ContentPage.ToolbarItems>
+
+    <Grid>
+        <RefreshView IsRefreshing="{Binding IsRefreshing}"
+                     Command="{Binding RefreshCommand}">
+            
+            <CollectionView ItemsSource="{Binding Rides}"
+                           SelectionMode="Single"
+                           SelectionChangedCommand="{Binding SelectRideCommand}"
+                           SelectionChangedCommandParameter="{Binding Source={RelativeSource Self}, Path=SelectedItem}">
+                
+                <CollectionView.EmptyView>
+                    <VerticalStackLayout VerticalOptions="Center" 
+                                        HorizontalOptions="Center"
+                                        Padding="20">
+                        <Label Text="No rides scheduled for today"
+                               FontSize="18"
+                               TextColor="{StaticResource Gray600}"
+                               HorizontalOptions="Center"/>
+                        <Label Text="Pull down to refresh"
+                               FontSize="14"
+                               TextColor="{StaticResource Gray400}"
+                               HorizontalOptions="Center"
+                               Margin="0,10,0,0"/>
+                    </VerticalStackLayout>
+                </CollectionView.EmptyView>
+
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="models:DriverRideListItemDto">
+                        <Frame Margin="10,5" 
+                               Padding="15" 
+                               BackgroundColor="White"
+                               BorderColor="{StaticResource Gray200}"
+                               CornerRadius="8"
+                               HasShadow="True">
+                            
+                            <Grid RowDefinitions="Auto,Auto,Auto,Auto" 
+                                  ColumnDefinitions="*,Auto"
+                                  RowSpacing="8">
+
+                                <!-- Pickup Time -->
+                                <Label Grid.Row="0" Grid.Column="0"
+                                       Text="{Binding PickupDateTime, StringFormat='{0:MMM dd, h:mm tt}'}"
+                                       FontSize="16"
+                                       FontAttributes="Bold"
+                                       TextColor="{StaticResource Primary}"/>
+
+                                <!-- Status Badge -->
+                                <Frame Grid.Row="0" Grid.Column="1"
+                                       Padding="8,4"
+                                       CornerRadius="12"
+                                       BackgroundColor="{StaticResource Primary}"
+                                       BorderColor="Transparent"
+                                       HasShadow="False">
+                                    <Label Text="{Binding Status}"
+                                           FontSize="12"
+                                           TextColor="White"
+                                           FontAttributes="Bold"/>
+                                </Frame>
+
+                                <!-- Passenger Name -->
+                                <Label Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                                       Text="{Binding PassengerName}"
+                                       FontSize="18"
+                                       FontAttributes="Bold"/>
+
+                                <!-- Pickup Location -->
+                                <HorizontalStackLayout Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                                                      Spacing="5">
+                                    <Label Text="??" FontSize="14"/>
+                                    <Label Text="{Binding PickupLocation}"
+                                           FontSize="14"
+                                           TextColor="{StaticResource Gray600}"/>
+                                </HorizontalStackLayout>
+
+                                <!-- Dropoff Location -->
+                                <HorizontalStackLayout Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2"
+                                                      Spacing="5">
+                                    <Label Text="??" FontSize="14"/>
+                                    <Label Text="{Binding DropoffLocation}"
+                                           FontSize="14"
+                                           TextColor="{StaticResource Gray600}"/>
+                                </HorizontalStackLayout>
+
+                            </Grid>
+                        </Frame>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+        </RefreshView>
+
+        <!-- Loading Overlay -->
+        <ActivityIndicator IsRunning="{Binding IsBusy}"
+                          IsVisible="{Binding IsBusy}"
+                          Color="{StaticResource Primary}"
+                          VerticalOptions="Center"
+                          HorizontalOptions="Center"/>
+    </Grid>
+
+</ContentPage>

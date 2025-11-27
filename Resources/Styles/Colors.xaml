@@ -25,8 +25,15 @@
     <Color x:Key="Gray400">#919191</Color>
     <Color x:Key="Gray500">#6E6E6E</Color>
     <Color x:Key="Gray600">#404040</Color>
+    <Color x:Key="Gray700">#333333</Color>
     <Color x:Key="Gray900">#212121</Color>
     <Color x:Key="Gray950">#141414</Color>
+
+    <!-- Semantic Colors -->
+    <Color x:Key="Success">#10B981</Color>
+    <Color x:Key="Danger">#EF4444</Color>
+    <Color x:Key="Warning">#F59E0B</Color>
+    <Color x:Key="Info">#3B82F6</Color>
 
     <SolidColorBrush x:Key="PrimaryBrush" Color="{StaticResource Primary}"/>
     <SolidColorBrush x:Key="SecondaryBrush" Color="{StaticResource Secondary}"/>
@@ -40,6 +47,12 @@
     <SolidColorBrush x:Key="Gray400Brush" Color="{StaticResource Gray400}"/>
     <SolidColorBrush x:Key="Gray500Brush" Color="{StaticResource Gray500}"/>
     <SolidColorBrush x:Key="Gray600Brush" Color="{StaticResource Gray600}"/>
+    <SolidColorBrush x:Key="Gray700Brush" Color="{StaticResource Gray700}"/>
     <SolidColorBrush x:Key="Gray900Brush" Color="{StaticResource Gray900}"/>
     <SolidColorBrush x:Key="Gray950Brush" Color="{StaticResource Gray950}"/>
+
+    <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource Success}"/>
+    <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource Danger}"/>
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource Warning}"/>
+    <SolidColorBrush x:Key="InfoBrush" Color="{StaticResource Info}"/>
 </ResourceDictionary>
