@@ -1,51 +1,33 @@
 using System.Net.Http.Json;
 using System.Text.Json;
-using Bellwood.DriverApp.Helpers;
 using Bellwood.DriverApp.Models;
 
 namespace Bellwood.DriverApp.Services;
 
 /// <summary>
-/// Implementation of authentication service using SecureStorage for token management
+/// Implementation of authentication service using SecureStorage for token management.
+/// Uses the named "auth" HttpClient configured in MauiProgram.
 /// </summary>
 public class AuthService : IAuthService
 {
     private readonly HttpClient _httpClient;
     private const string AccessTokenKey = "bellwood_access_token";
 
-    public AuthService(HttpClient httpClient)
+    public AuthService(IHttpClientFactory httpClientFactory)
     {
-        _httpClient = httpClient;
-        
-        // Configure HttpClient for AuthServer
-        _httpClient.BaseAddress = new Uri(AppSettings.AuthServerBaseUrl);
-        
-#if DEBUG
-        // Accept self-signed certificates in development (Android emulator)
-        var handler = new HttpClientHandler
-        {
-            ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true
-        };
-        // Note: In production, this handler should NOT be used
-#endif
+        // Use the "auth" client – base address and dev-cert override are set in MauiProgram
+        _httpClient = httpClientFactory.CreateClient("auth");
     }
 
     public async Task<(bool Success, string? ErrorMessage)> LoginAsync(string username, string password)
     {
         try
         {
-            var loginRequest = new LoginRequest
-            {
-                Username = username,
-                Password = password
-            };
-
+            var loginRequest = new LoginRequest { Username = username, Password = password };
             var response = await _httpClient.PostAsJsonAsync("/api/auth/login", loginRequest);
 
             if (!response.IsSuccessStatusCode)
             {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                
                 return response.StatusCode switch
                 {
                     System.Net.HttpStatusCode.Unauthorized => (false, "Invalid username or password"),
@@ -55,7 +37,6 @@ public class AuthService : IAuthService
             }
 
             var loginResponse = await response.Content.ReadFromJsonAsync<LoginResponse>();
-            
             if (loginResponse?.AccessToken == null)
             {
                 return (false, "Invalid response from server");
@@ -63,7 +44,6 @@ public class AuthService : IAuthService
 
             // Store token securely
             await SecureStorage.SetAsync(AccessTokenKey, loginResponse.AccessToken);
-
             return (true, null);
         }
         catch (HttpRequestException ex)
@@ -78,10 +58,7 @@ public class AuthService : IAuthService
 
     public async Task SignOutAsync()
     {
-        // Clear stored token
         SecureStorage.Remove(AccessTokenKey);
-        
-        // Stop any ongoing location tracking (handled by LocationTracker service)
         await Task.CompletedTask;
     }
 

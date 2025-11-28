@@ -6,8 +6,8 @@
 - [ ] AuthServer running on `https://localhost:5001`
 - [ ] Can access login endpoint: `POST /api/auth/login`
 - [ ] Test driver account exists with:
-  - [ ] Username: ________________
-  - [ ] Password: ________________
+  - [ ] Username: charlie
+  - [ ] Password: password
   - [ ] Role: `driver`
   - [ ] UID: `driver-001`
 

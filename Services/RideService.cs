@@ -1,20 +1,20 @@
 using System.Net.Http.Json;
-using Bellwood.DriverApp.Helpers;
 using Bellwood.DriverApp.Models;
 
 namespace Bellwood.DriverApp.Services;
 
 /// <summary>
-/// Implementation of ride service using AdminAPI
+/// Implementation of ride service using AdminAPI driver endpoints.
+/// Uses the named "driver-admin" HttpClient configured in MauiProgram.
 /// </summary>
 public class RideService : IRideService
 {
     private readonly HttpClient _httpClient;
 
-    public RideService(HttpClient httpClient)
+    public RideService(IHttpClientFactory httpClientFactory)
     {
-        _httpClient = httpClient;
-        _httpClient.BaseAddress = new Uri(AppSettings.AdminApiBaseUrl);
+        // Use the "driver-admin" client – base address and dev-cert override are set in MauiProgram
+        _httpClient = httpClientFactory.CreateClient("driver-admin");
     }
 
     public async Task<List<DriverRideListItemDto>> GetTodaysRidesAsync()
@@ -22,10 +22,8 @@ public class RideService : IRideService
         try
         {
             var response = await _httpClient.GetAsync("/driver/rides/today");
-            
             if (!response.IsSuccessStatusCode)
             {
-                // Log error but return empty list to avoid crashing UI
                 Console.WriteLine($"Failed to fetch rides: {response.StatusCode}");
                 return new List<DriverRideListItemDto>();
             }
@@ -45,7 +43,6 @@ public class RideService : IRideService
         try
         {
             var response = await _httpClient.GetAsync($"/driver/rides/{rideId}");
-            
             if (!response.IsSuccessStatusCode)
             {
                 Console.WriteLine($"Failed to fetch ride details: {response.StatusCode}");
@@ -66,13 +63,10 @@ public class RideService : IRideService
         try
         {
             var request = new RideStatusUpdateRequest { NewStatus = newStatus };
-            
             var response = await _httpClient.PostAsJsonAsync($"/driver/rides/{rideId}/status", request);
 
             if (!response.IsSuccessStatusCode)
             {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                
                 return response.StatusCode switch
                 {
                     System.Net.HttpStatusCode.BadRequest => (false, "Invalid status transition"),
