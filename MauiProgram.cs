@@ -1,74 +1,98 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using System.Net.Http.Headers;
+using Microsoft.Extensions.Logging;
 using Bellwood.DriverApp.Services;
 using Bellwood.DriverApp.ViewModels;
 using Bellwood.DriverApp.Views;
 using Bellwood.DriverApp.Handlers;
 
-namespace Bellwood.DriverApp
+namespace Bellwood.DriverApp;
+
+public static class MauiProgram
 {
-    public static class MauiProgram
+    public static MauiApp CreateMauiApp()
     {
-        public static MauiApp CreateMauiApp()
-        {
-            var builder = MauiApp.CreateBuilder();
-            builder
-                .UseMauiApp<App>()
-                .ConfigureFonts(fonts =>
-                {
-                    fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
-                    fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
-                });
+        var builder = MauiApp.CreateBuilder();
 
-            // Register HTTP Clients with platform-specific configuration
-            RegisterHttpClients(builder.Services);
-
-            // Register Services
-            builder.Services.AddSingleton<IAuthService, AuthService>();
-            builder.Services.AddSingleton<ILocationTracker, LocationTracker>();
-
-            // Register ViewModels
-            builder.Services.AddTransient<LoginViewModel>();
-            builder.Services.AddTransient<HomeViewModel>();
-            builder.Services.AddTransient<RideDetailViewModel>();
-
-            // Register Views
-            builder.Services.AddTransient<LoginPage>();
-            builder.Services.AddTransient<HomePage>();
-            builder.Services.AddTransient<RideDetailPage>();
-
-#if DEBUG
-            builder.Logging.AddDebug();
-#endif
-
-            return builder.Build();
-        }
-
-        private static void RegisterHttpClients(IServiceCollection services)
-        {
-            // Create HttpClientHandler for development (accepts self-signed certs)
-#if DEBUG
-            var handler = new HttpClientHandler
+        builder
+            .UseMauiApp<App>()
+            .ConfigureFonts(fonts =>
             {
-                ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true
-            };
-#else
-            var handler = new HttpClientHandler();
+                fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
+                fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
+            });
+
+#if DEBUG
+        builder.Logging.AddDebug();
 #endif
 
-            // Register AuthService HttpClient (no auth handler needed for login endpoint)
-            services.AddHttpClient<IAuthService, AuthService>()
-                .ConfigurePrimaryHttpMessageHandler(() => handler);
+        // -------- Views / ViewModels --------
+        builder.Services.AddTransient<LoginPage>();
+        builder.Services.AddTransient<HomePage>();
+        builder.Services.AddTransient<RideDetailPage>();
 
-            // Register HttpClient with AuthHttpHandler for authenticated endpoints
-            services.AddTransient<AuthHttpHandler>();
+        builder.Services.AddTransient<LoginViewModel>();
+        builder.Services.AddTransient<HomeViewModel>();
+        builder.Services.AddTransient<RideDetailViewModel>();
 
-            services.AddHttpClient<IRideService, RideService>()
-                .ConfigurePrimaryHttpMessageHandler(() => handler)
-                .AddHttpMessageHandler<AuthHttpHandler>();
+        // -------- Services --------
+        builder.Services.AddSingleton<IAuthService, AuthService>();
+        builder.Services.AddSingleton<IRideService, RideService>();
+        builder.Services.AddSingleton<ILocationTracker, LocationTracker>();
 
-            services.AddHttpClient<ILocationTracker, LocationTracker>()
-                .ConfigurePrimaryHttpMessageHandler(() => handler)
-                .AddHttpMessageHandler<AuthHttpHandler>();
-        }
+        // Auth handler for protected AdminAPI calls
+        builder.Services.AddTransient<AuthHttpHandler>();
+
+        // ===== HTTP CLIENTS =====
+
+        // 1. Auth Server client (login)
+        builder.Services.AddHttpClient("auth", c =>
+        {
+#if ANDROID
+            c.BaseAddress = new Uri("https://10.0.2.2:5001");
+#elif IOS || MACCATALYST
+            c.BaseAddress = new Uri("https://localhost:5001");
+#else
+            c.BaseAddress = new Uri("https://localhost:5001");
+#endif
+            c.DefaultRequestHeaders.Accept.Add(
+                new MediaTypeWithQualityHeaderValue("application/json"));
+        })
+#if DEBUG
+        .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+        {
+            // DEV ONLY: trust local dev certs
+            ServerCertificateCustomValidationCallback =
+                HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+        });
+#else
+        .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler());
+#endif
+
+        // 2. AdminAPI client for driver endpoints (protected)
+        builder.Services.AddHttpClient("driver-admin", c =>
+        {
+#if ANDROID
+            c.BaseAddress = new Uri("https://10.0.2.2:5206");
+#elif IOS || MACCATALYST
+            c.BaseAddress = new Uri("https://localhost:5206");
+#else
+            c.BaseAddress = new Uri("https://localhost:5206");
+#endif
+            c.DefaultRequestHeaders.Accept.Add(
+                new MediaTypeWithQualityHeaderValue("application/json"));
+        })
+        .AddHttpMessageHandler<AuthHttpHandler>()
+#if DEBUG
+        .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+        {
+            // DEV ONLY: trust local dev certs
+            ServerCertificateCustomValidationCallback =
+                HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+        });
+#else
+        .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler());
+#endif
+
+        return builder.Build();
     }
 }

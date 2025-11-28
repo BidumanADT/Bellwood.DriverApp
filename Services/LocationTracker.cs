@@ -1,7 +1,7 @@
-using System.Collections.Concurrent;
-using System.Net.Http.Json;
 using Bellwood.DriverApp.Helpers;
 using Bellwood.DriverApp.Models;
+using System.Collections.Concurrent;
+using System.Net.Http.Json;
 
 namespace Bellwood.DriverApp.Services;
 
@@ -12,24 +12,22 @@ public class LocationTracker : ILocationTracker
 {
     private readonly HttpClient _httpClient;
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _activeTrackers = new();
-    
+
     public event EventHandler<string>? LocationUpdateFailed;
 
-    public LocationTracker(HttpClient httpClient)
+    // Use IHttpClientFactory + named client "driver-admin"
+    public LocationTracker(IHttpClientFactory httpClientFactory)
     {
-        _httpClient = httpClient;
-        _httpClient.BaseAddress = new Uri(AppSettings.AdminApiBaseUrl);
+        _httpClient = httpClientFactory.CreateClient("driver-admin");
     }
 
     public async Task<bool> StartTrackingAsync(string rideId)
     {
-        // Check if already tracking this ride
         if (_activeTrackers.ContainsKey(rideId))
         {
             return true; // Already tracking
         }
 
-        // Request location permissions
         var status = await CheckAndRequestLocationPermission();
         if (status != PermissionStatus.Granted)
         {
@@ -37,15 +35,13 @@ public class LocationTracker : ILocationTracker
             return false;
         }
 
-        // Create cancellation token for this ride's tracking
         var cts = new CancellationTokenSource();
-        
+
         if (!_activeTrackers.TryAdd(rideId, cts))
         {
             return false; // Race condition, already added
         }
 
-        // Start background tracking loop
         _ = Task.Run(async () => await TrackLocationLoopAsync(rideId, cts.Token), cts.Token);
 
         return true;
@@ -58,7 +54,7 @@ public class LocationTracker : ILocationTracker
             cts.Cancel();
             cts.Dispose();
         }
-        
+
         await Task.CompletedTask;
     }
 
@@ -69,15 +65,13 @@ public class LocationTracker : ILocationTracker
             kvp.Value.Cancel();
             kvp.Value.Dispose();
         }
-        
+
         _activeTrackers.Clear();
         await Task.CompletedTask;
     }
 
-    public bool IsTracking(string rideId)
-    {
-        return _activeTrackers.ContainsKey(rideId);
-    }
+    public bool IsTracking(string rideId) =>
+        _activeTrackers.ContainsKey(rideId);
 
     private async Task TrackLocationLoopAsync(string rideId, CancellationToken cancellationToken)
     {
@@ -86,10 +80,9 @@ public class LocationTracker : ILocationTracker
 
         try
         {
-            // Send first update immediately
+            // First update immediately
             await SendLocationUpdateAsync(rideId, cancellationToken);
 
-            // Then send updates at configured interval
             while (await timer.WaitForNextTickAsync(cancellationToken))
             {
                 await SendLocationUpdateAsync(rideId, cancellationToken);
@@ -97,7 +90,7 @@ public class LocationTracker : ILocationTracker
         }
         catch (OperationCanceledException)
         {
-            // Normal cancellation, exit gracefully
+            // Normal cancellation
         }
         catch (Exception ex)
         {
@@ -110,7 +103,6 @@ public class LocationTracker : ILocationTracker
     {
         try
         {
-            // Get current location
             var location = await Geolocation.GetLocationAsync(new GeolocationRequest
             {
                 DesiredAccuracy = GeolocationAccuracy.Best,
@@ -123,7 +115,6 @@ public class LocationTracker : ILocationTracker
                 return;
             }
 
-            // Send to server
             var update = new LocationUpdate
             {
                 RideId = rideId,
@@ -138,8 +129,7 @@ public class LocationTracker : ILocationTracker
             {
                 var statusCode = response.StatusCode;
                 Console.WriteLine($"Location update failed: {statusCode}");
-                
-                // If server says ride isn't active, stop tracking
+
                 if (statusCode == System.Net.HttpStatusCode.BadRequest)
                 {
                     await StopTrackingAsync(rideId);
@@ -148,7 +138,6 @@ public class LocationTracker : ILocationTracker
         }
         catch (OperationCanceledException)
         {
-            // Expected during cancellation
             throw;
         }
         catch (Exception ex)
@@ -171,7 +160,6 @@ public class LocationTracker : ILocationTracker
         }
 
         status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
-
         return status;
     }
 }
