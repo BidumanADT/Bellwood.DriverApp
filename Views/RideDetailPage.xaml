@@ -39,32 +39,33 @@
                    CornerRadius="8"
                    HasShadow="False">
                 <HorizontalStackLayout Spacing="10">
-                    <Label Text="??" FontSize="16"/>
+                    <Label Text="📍" FontSize="16"/>
                     <Label Text="Location tracking active"
                            TextColor="White"
                            FontAttributes="Bold"/>
                 </HorizontalStackLayout>
             </Frame>
 
-            <!-- Contact Info -->
+            <!-- Passenger Info -->
             <Frame Margin="10" Padding="15" BackgroundColor="White" CornerRadius="8">
                 <VerticalStackLayout Spacing="10">
-                    <Label Text="Contact Information"
+                    <Label Text="Passenger Information"
                            FontSize="18"
                            FontAttributes="Bold"/>
                     
                     <HorizontalStackLayout Spacing="10">
-                        <Label Text="??" FontSize="16"/>
-                        <Label Text="{Binding Ride.PassengerPhone}"
+                        <Label Text="👤" FontSize="16"/>
+                        <Label Text="{Binding Ride.PassengerName}"
                                FontSize="16"
                                TextColor="{StaticResource Gray700}"/>
                     </HorizontalStackLayout>
 
-                    <Button Text="Call Passenger"
-                            Command="{Binding CallPassengerCommand}"
-                            BackgroundColor="{StaticResource Success}"
-                            TextColor="White"
-                            CornerRadius="8"/>
+                    <HorizontalStackLayout Spacing="10">
+                        <Label Text="👥" FontSize="16"/>
+                        <Label Text="{Binding Ride.PassengerCount, StringFormat='{0} passenger(s)'}"
+                               FontSize="16"
+                               TextColor="{StaticResource Gray700}"/>
+                    </HorizontalStackLayout>
                 </VerticalStackLayout>
             </Frame>
 
@@ -77,8 +78,8 @@
 
                     <!-- Pickup -->
                     <VerticalStackLayout Spacing="5">
-                        <Label Text="Pick Up" 
-                               FontSize="14" 
+                        <Label Text="PICK UP" 
+                               FontSize="12" 
                                TextColor="{StaticResource Gray500}"
                                FontAttributes="Bold"/>
                         <Label Text="{Binding Ride.PickupLocation}"
@@ -89,7 +90,8 @@
                                IsVisible="{Binding Ride.PickupStyle, Converter={StaticResource IsNotNullConverter}}"/>
                         <Label Text="{Binding Ride.PickupSignText, StringFormat='Sign: {0}'}"
                                FontSize="14"
-                               TextColor="{StaticResource Gray600}"
+                               TextColor="{StaticResource Info}"
+                               FontAttributes="Bold"
                                IsVisible="{Binding Ride.PickupSignText, Converter={StaticResource IsNotNullConverter}}"/>
                         <Button Text="Navigate to Pick Up"
                                 Command="{Binding NavigateToPickupCommand}"
@@ -99,10 +101,12 @@
                                 Margin="0,5,0,0"/>
                     </VerticalStackLayout>
 
+                    <BoxView HeightRequest="1" Color="{StaticResource Gray200}" Margin="0,5"/>
+
                     <!-- Dropoff -->
                     <VerticalStackLayout Spacing="5">
-                        <Label Text="Drop Off" 
-                               FontSize="14" 
+                        <Label Text="DROP OFF" 
+                               FontSize="12" 
                                TextColor="{StaticResource Gray500}"
                                FontAttributes="Bold"/>
                         <Label Text="{Binding Ride.DropoffLocation}"
@@ -119,35 +123,49 @@
 
             <!-- Ride Details -->
             <Frame Margin="10" Padding="15" BackgroundColor="White" CornerRadius="8">
-                <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto" 
-                      ColumnDefinitions="*,*"
-                      RowSpacing="10"
-                      ColumnSpacing="10">
-
-                    <Label Grid.Row="0" Grid.ColumnSpan="2"
-                           Text="Ride Details"
+                <VerticalStackLayout Spacing="10">
+                    <Label Text="Ride Details"
                            FontSize="18"
                            FontAttributes="Bold"/>
 
-                    <Label Grid.Row="1" Grid.Column="0"
-                           Text="{Binding Ride.PassengerCount, StringFormat='?? {0} passengers'}"/>
-                    <Label Grid.Row="1" Grid.Column="1"
-                           Text="{Binding Ride.VehicleClass, StringFormat='?? {0}'}"/>
+                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" RowSpacing="8" ColumnSpacing="10">
+                        <Label Grid.Row="0" Grid.Column="0"
+                               Text="{Binding Ride.VehicleClass, StringFormat='🚗 {0}'}"
+                               FontSize="14"/>
+                        <Label Grid.Row="0" Grid.Column="1"
+                               Text="{Binding Ride.PassengerCount, StringFormat='👥 {0} passenger(s)'}"
+                               FontSize="14"/>
+                        <Label Grid.Row="1" Grid.Column="0"
+                               Text="{Binding Ride.CheckedBags, StringFormat='🧳 {0} checked bag(s)'}"
+                               FontSize="14"/>
+                        <Label Grid.Row="1" Grid.Column="1"
+                               Text="{Binding Ride.CarryOnBags, StringFormat='🎒 {0} carry-on(s)'}"
+                               FontSize="14"/>
+                    </Grid>
 
-                    <Label Grid.Row="2" Grid.Column="0"
-                           Text="{Binding Ride.CheckedBags, StringFormat='?? {0} checked'}"/>
-                    <Label Grid.Row="2" Grid.Column="1"
-                           Text="{Binding Ride.CarryOnBags, StringFormat='?? {0} carry-on'}"/>
-
-                    <Label Grid.Row="3" Grid.ColumnSpan="2"
-                           Text="{Binding Ride.OutboundFlight.FlightNumber, StringFormat='?? Flight: {0}'}"
+                    <!-- Flight Info -->
+                    <Label Text="{Binding Ride.OutboundFlight.FlightNumber, StringFormat='✈️ Flight: {0}'}"
+                           FontSize="14"
                            IsVisible="{Binding Ride.OutboundFlight.FlightNumber, Converter={StaticResource IsNotNullConverter}}"/>
 
-                    <Label Grid.Row="4" Grid.ColumnSpan="2"
-                           Text="{Binding Ride.AdditionalRequest, StringFormat='?? Note: {0}'}"
-                           IsVisible="{Binding Ride.AdditionalRequest, Converter={StaticResource IsNotNullConverter}}"
-                           TextColor="{StaticResource Warning}"/>
-                </Grid>
+                    <!-- Special Requests -->
+                    <Frame IsVisible="{Binding Ride.AdditionalRequest, Converter={StaticResource IsNotNullConverter}}"
+                           BackgroundColor="{StaticResource Warning}"
+                           Padding="10"
+                           CornerRadius="8"
+                           HasShadow="False"
+                           Margin="0,5,0,0">
+                        <VerticalStackLayout Spacing="5">
+                            <Label Text="📝 Special Request"
+                                   FontSize="12"
+                                   FontAttributes="Bold"
+                                   TextColor="White"/>
+                            <Label Text="{Binding Ride.AdditionalRequest}"
+                                   FontSize="14"
+                                   TextColor="White"/>
+                        </VerticalStackLayout>
+                    </Frame>
+                </VerticalStackLayout>
             </Frame>
 
             <!-- Status Update Buttons -->
@@ -157,44 +175,54 @@
                            FontSize="18"
                            FontAttributes="Bold"/>
 
-                    <Button Text="Start Trip (On Route)"
+                    <Button Text="▶️ Start Trip (On Route)"
                             Command="{Binding UpdateStatusCommand}"
                             CommandParameter="OnRoute"
                             IsVisible="{Binding CanTransitionToOnRoute}"
                             BackgroundColor="{StaticResource Primary}"
                             TextColor="White"
+                            FontAttributes="Bold"
+                            HeightRequest="50"
                             CornerRadius="8"/>
 
-                    <Button Text="Mark Arrived"
+                    <Button Text="📍 Mark Arrived"
                             Command="{Binding UpdateStatusCommand}"
                             CommandParameter="Arrived"
                             IsVisible="{Binding CanTransitionToArrived}"
                             BackgroundColor="{StaticResource Info}"
                             TextColor="White"
+                            FontAttributes="Bold"
+                            HeightRequest="50"
                             CornerRadius="8"/>
 
-                    <Button Text="Passenger Onboard"
+                    <Button Text="🚗 Passenger Onboard"
                             Command="{Binding UpdateStatusCommand}"
                             CommandParameter="PassengerOnboard"
                             IsVisible="{Binding CanTransitionToPassengerOnboard}"
                             BackgroundColor="{StaticResource Success}"
                             TextColor="White"
+                            FontAttributes="Bold"
+                            HeightRequest="50"
                             CornerRadius="8"/>
 
-                    <Button Text="Complete Ride"
+                    <Button Text="✅ Complete Ride"
                             Command="{Binding UpdateStatusCommand}"
                             CommandParameter="Completed"
                             IsVisible="{Binding CanTransitionToCompleted}"
                             BackgroundColor="{StaticResource Success}"
                             TextColor="White"
+                            FontAttributes="Bold"
+                            HeightRequest="50"
                             CornerRadius="8"/>
 
-                    <Button Text="Cancel Ride"
+                    <Button Text="❌ Cancel Ride"
                             Command="{Binding UpdateStatusCommand}"
                             CommandParameter="Cancelled"
                             IsVisible="{Binding CanCancel}"
                             BackgroundColor="{StaticResource Danger}"
                             TextColor="White"
+                            FontAttributes="Bold"
+                            HeightRequest="50"
                             CornerRadius="8"/>
                 </VerticalStackLayout>
             </Frame>
@@ -212,6 +240,9 @@
                               IsVisible="{Binding IsBusy}"
                               Color="{StaticResource Primary}"
                               Margin="20"/>
+
+            <!-- Bottom spacing -->
+            <BoxView HeightRequest="20"/>
 
         </VerticalStackLayout>
     </ScrollView>

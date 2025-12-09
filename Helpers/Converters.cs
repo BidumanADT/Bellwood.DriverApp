@@ -25,12 +25,15 @@ public class InvertedBoolConverter : IValueConverter
 }
 
 /// <summary>
-/// Checks if a value is not null
+/// Checks if a value is not null and not empty string
 /// </summary>
 public class IsNotNullConverter : IValueConverter
 {
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
+        if (value is string stringValue)
+            return !string.IsNullOrWhiteSpace(stringValue);
+        
         return value != null;
     }
 

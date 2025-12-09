@@ -15,9 +15,6 @@ public partial class RideDetailViewModel : BaseViewModel
     private readonly ILocationTracker _locationTracker;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanTransitionToOnRoute), nameof(CanTransitionToArrived), 
-                              nameof(CanTransitionToPassengerOnboard), nameof(CanTransitionToCompleted), 
-                              nameof(CanCancel))]
     private DriverRideDetailDto? _ride;
 
     [ObservableProperty]
@@ -25,6 +22,22 @@ public partial class RideDetailViewModel : BaseViewModel
 
     [ObservableProperty]
     private bool _isTracking;
+
+    // Computed visibility properties for status buttons
+    [ObservableProperty]
+    private bool _canTransitionToOnRoute;
+
+    [ObservableProperty]
+    private bool _canTransitionToArrived;
+
+    [ObservableProperty]
+    private bool _canTransitionToPassengerOnboard;
+
+    [ObservableProperty]
+    private bool _canTransitionToCompleted;
+
+    [ObservableProperty]
+    private bool _canCancel;
 
     public RideDetailViewModel(IRideService rideService, ILocationTracker locationTracker)
     {
@@ -39,6 +52,20 @@ public partial class RideDetailViewModel : BaseViewModel
         {
             _ = LoadRideDetailsAsync();
         }
+    }
+
+    partial void OnRideChanged(DriverRideDetailDto? value)
+    {
+        UpdateCanTransitionProperties();
+    }
+
+    private void UpdateCanTransitionProperties()
+    {
+        CanTransitionToOnRoute = Ride?.Status == RideStatus.Scheduled;
+        CanTransitionToArrived = Ride?.Status == RideStatus.OnRoute;
+        CanTransitionToPassengerOnboard = Ride?.Status == RideStatus.Arrived;
+        CanTransitionToCompleted = Ride?.Status == RideStatus.PassengerOnboard;
+        CanCancel = Ride != null && Ride.Status != RideStatus.Completed && Ride.Status != RideStatus.Cancelled;
     }
 
     private async Task LoadRideDetailsAsync()
@@ -103,9 +130,12 @@ public partial class RideDetailViewModel : BaseViewModel
 
             if (result.Success)
             {
-                // Update local ride status
+                // Update local ride status and trigger property changed
                 this.Ride.Status = newStatus;
+                
+                // Manually trigger property updates since we're modifying the object not replacing it
                 OnPropertyChanged(nameof(Ride));
+                UpdateCanTransitionProperties();
 
                 // Handle location tracking based on new status
                 await HandleLocationTracking(newStatus);
@@ -176,25 +206,6 @@ public partial class RideDetailViewModel : BaseViewModel
         await LaunchMapsAsync(this.Ride.DropoffLocation);
     }
 
-    [RelayCommand]
-    private async Task CallPassengerAsync()
-    {
-        if (string.IsNullOrEmpty(this.Ride?.PassengerPhone))
-        {
-            await Shell.Current.DisplayAlert("No Phone", "No phone number available for this passenger", "OK");
-            return;
-        }
-
-        try
-        {
-            PhoneDialer.Open(this.Ride.PassengerPhone);
-        }
-        catch (Exception ex)
-        {
-            await Shell.Current.DisplayAlert("Error", $"Unable to open phone dialer: {ex.Message}", "OK");
-        }
-    }
-
     private async Task LaunchMapsAsync(string address)
     {
         try
@@ -226,11 +237,4 @@ public partial class RideDetailViewModel : BaseViewModel
             _ => status.ToString()
         };
     }
-
-    // Show which status buttons should be visible based on current status
-    public bool CanTransitionToOnRoute => this.Ride?.Status == RideStatus.Scheduled;
-    public bool CanTransitionToArrived => this.Ride?.Status == RideStatus.OnRoute;
-    public bool CanTransitionToPassengerOnboard => this.Ride?.Status == RideStatus.Arrived;
-    public bool CanTransitionToCompleted => this.Ride?.Status == RideStatus.PassengerOnboard;
-    public bool CanCancel => this.Ride?.Status != RideStatus.Completed && this.Ride?.Status != RideStatus.Cancelled;
 }

@@ -28,24 +28,33 @@ The app requires the following backend services to be running:
 3. **Login with test credentials**
    - Username: Your test driver username
    - Password: Your test driver password
-   - Account must have `role=driver` and `uid=driver-001`
+   - Account must have `role=driver` and `uid` matching assigned rides
 
 ---
 
-## 📋 Features Implemented
+## 📋 Phase 1 Features
 
-### ✅ Phase 1 Complete
-- JWT-based authentication with SecureStorage
-- View today's assigned rides
-- Detailed ride information display
-- FSM-validated ride status updates
-- Real-time GPS location tracking (30s interval)
-- Call passenger directly from app
-- Navigate to pickup/dropoff via native maps
-- Pull-to-refresh ride list
-- Automatic token injection via AuthHttpHandler
-- 401 handling with auto sign-out
-- Comprehensive error handling
+### ✅ Complete
+- **Authentication**: JWT-based login with SecureStorage
+- **Ride List**: View today's assigned rides (next 24 hours)
+- **Pull-to-Refresh**: Manual refresh of ride list
+- **Ride Details**: Full ride information display
+  - Passenger name and count
+  - Pickup/dropoff locations with navigation buttons
+  - Pickup style and sign text
+  - Vehicle class
+  - Luggage count (checked and carry-on)
+  - Flight information (if applicable)
+  - Special requests highlighted
+- **Status Updates**: FSM-validated ride status transitions
+  - Scheduled → On Route → Arrived → Passenger Onboard → Completed
+  - Cancel option available at each step
+- **Navigation**: Launch native maps app for pickup/dropoff locations
+- **Location Tracking**: Real-time GPS updates (30s interval)
+  - Automatic start when trip begins
+  - Automatic stop on completion/cancellation
+  - Visual indicator when tracking active
+- **Sign Out**: Secure logout with confirmation
 
 ---
 
@@ -91,21 +100,20 @@ Built with .NET 8 MAUI using MVVM pattern:
 
 ## 🧪 Testing
 
-See [TESTING-GUIDE.md](TESTING-GUIDE.md) for comprehensive test scenarios.
-
 ### Quick Test Flow
 1. Start AuthServer (port 5001) and AdminAPI (port 5206)
-2. Seed test data: `POST /bookings/seed`
-3. Login with driver credentials
-4. Test ride list, detail view, status updates, location tracking
+2. Seed test data: `POST /bookings/seed` and `POST /dev/seed-affiliates`
+3. Assign a driver to a booking via AdminPortal
+4. Login with driver credentials
+5. Test: Tap ride → View details → Navigate → Update status → Location tracking
 
----
-
-## 📚 Documentation
-
-- [DEV-README.md](DEV-README.md) - High-level design and architecture
-- [DRIVER_API_SUMMARY.md](DRIVER_API_SUMMARY.md) - API specifications
-- [TESTING-GUIDE.md](TESTING-GUIDE.md) - Test scenarios and checklist
+### Status Workflow
+```
+Scheduled → Start Trip → On Route
+On Route → Mark Arrived → Arrived
+Arrived → Passenger Onboard → Passenger Onboard
+Passenger Onboard → Complete Ride → Completed
+```
 
 ---
 
@@ -115,7 +123,7 @@ Android emulator uses `10.0.2.2` to access host `localhost`:
 - AuthServer: `https://10.0.2.2:5001`
 - AdminAPI: `https://10.0.2.2:5206`
 
-Production URLs configured in `Helpers/AppSettings.cs`
+Production URLs configured in `MauiProgram.cs`
 
 ---
 
@@ -138,10 +146,16 @@ Production URLs configured in `Helpers/AppSettings.cs`
 
 ---
 
+## 📚 Documentation
+
+- [DEV-README.md](DEV-README.md) - High-level design and architecture
+- [DRIVER_API_SUMMARY.md](DRIVER_API_SUMMARY.md) - API specifications
+
+---
+
 ## 📞 Support
 
 For questions or issues:
-- Review [TESTING-GUIDE.md](TESTING-GUIDE.md)
 - Check AdminAPI Swagger docs (`/swagger` in dev mode)
 - Contact the mobile development team
 

@@ -9,18 +9,16 @@
 
     <ContentPage.ToolbarItems>
         <ToolbarItem Text="Sign Out" 
-                     Command="{Binding SignOutCommand}"
-                     IconImageSource="logout.png"/>
+                     Command="{Binding SignOutCommand}"/>
     </ContentPage.ToolbarItems>
 
     <Grid>
         <RefreshView IsRefreshing="{Binding IsRefreshing}"
                      Command="{Binding RefreshCommand}">
             
-            <CollectionView ItemsSource="{Binding Rides}"
-                           SelectionMode="Single"
-                           SelectionChangedCommand="{Binding SelectRideCommand}"
-                           SelectionChangedCommandParameter="{Binding Source={RelativeSource Self}, Path=SelectedItem}">
+            <CollectionView x:Name="RidesCollectionView"
+                           ItemsSource="{Binding Rides}"
+                           SelectionMode="None">
                 
                 <CollectionView.EmptyView>
                     <VerticalStackLayout VerticalOptions="Center" 
@@ -46,6 +44,12 @@
                                BorderColor="{StaticResource Gray200}"
                                CornerRadius="8"
                                HasShadow="True">
+                            
+                            <Frame.GestureRecognizers>
+                                <TapGestureRecognizer 
+                                    Command="{Binding Source={RelativeSource AncestorType={x:Type viewmodels:HomeViewModel}}, Path=SelectRideCommand}"
+                                    CommandParameter="{Binding .}"/>
+                            </Frame.GestureRecognizers>
                             
                             <Grid RowDefinitions="Auto,Auto,Auto,Auto" 
                                   ColumnDefinitions="*,Auto"
@@ -80,7 +84,7 @@
                                 <!-- Pickup Location -->
                                 <HorizontalStackLayout Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
                                                       Spacing="5">
-                                    <Label Text="??" FontSize="14"/>
+                                    <Label Text="📍" FontSize="14"/>
                                     <Label Text="{Binding PickupLocation}"
                                            FontSize="14"
                                            TextColor="{StaticResource Gray600}"/>
@@ -89,7 +93,7 @@
                                 <!-- Dropoff Location -->
                                 <HorizontalStackLayout Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2"
                                                       Spacing="5">
-                                    <Label Text="??" FontSize="14"/>
+                                    <Label Text="🏁" FontSize="14"/>
                                     <Label Text="{Binding DropoffLocation}"
                                            FontSize="14"
                                            TextColor="{StaticResource Gray600}"/>
