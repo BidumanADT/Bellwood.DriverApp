@@ -1,150 +1,355 @@
-using Bellwood.DriverApp.Helpers;
 using Bellwood.DriverApp.Models;
+using Bellwood.DriverApp.Helpers;
 using System.Collections.Concurrent;
 using System.Net.Http.Json;
 
 namespace Bellwood.DriverApp.Services;
 
 /// <summary>
-/// Implementation of location tracking using MAUI Geolocation and periodic timers
+/// Implementation of location tracking using MAUI Geolocation and periodic timers.
+/// Supports dynamic interval adjustment, retry logic, and background tracking.
 /// </summary>
 public class LocationTracker : ILocationTracker
 {
     private readonly HttpClient _httpClient;
-    private readonly ConcurrentDictionary<string, CancellationTokenSource> _activeTrackers = new();
+    private readonly ConcurrentDictionary<string, TrackingSession> _activeSessions = new();
 
-    public event EventHandler<string>? LocationUpdateFailed;
+    public event EventHandler<LocationUpdateFailedEventArgs>? LocationUpdateFailed;
+    public event EventHandler<TrackingStatusChangedEventArgs>? TrackingStatusChanged;
+    public event EventHandler<LocationSentEventArgs>? LocationSent;
 
-    // Use IHttpClientFactory + named client "driver-admin"
+    /// <summary>
+    /// Internal class to manage per-ride tracking state
+    /// </summary>
+    private class TrackingSession
+    {
+        public required string RideId { get; init; }
+        public CancellationTokenSource Cts { get; } = new();
+        public TrackingStatus Status { get; set; } = TrackingStatus.Active;
+        public double? DestinationLatitude { get; set; }
+        public double? DestinationLongitude { get; set; }
+        public int CurrentIntervalSeconds { get; set; }
+        public int ConsecutiveFailures { get; set; }
+        public DateTime? LastSuccessfulUpdate { get; set; }
+    }
+
     public LocationTracker(IHttpClientFactory httpClientFactory)
     {
         _httpClient = httpClientFactory.CreateClient("driver-admin");
     }
 
-    public async Task<bool> StartTrackingAsync(string rideId)
+    public async Task<bool> StartTrackingAsync(string rideId, double? destinationLatitude = null, double? destinationLongitude = null)
     {
-        if (_activeTrackers.ContainsKey(rideId))
+        if (_activeSessions.ContainsKey(rideId))
         {
-            return true; // Already tracking
+            // Update destination if already tracking
+            if (_activeSessions.TryGetValue(rideId, out var existingSession))
+            {
+                existingSession.DestinationLatitude = destinationLatitude;
+                existingSession.DestinationLongitude = destinationLongitude;
+            }
+            return true;
         }
 
         var status = await CheckAndRequestLocationPermission();
         if (status != PermissionStatus.Granted)
         {
-            LocationUpdateFailed?.Invoke(this, "Location permission denied");
+            RaiseTrackingStatusChanged(rideId, TrackingStatus.Inactive, TrackingStatus.PermissionRequired, 
+                LocationConfig.GpsUnavailableMessage);
+            RaiseLocationUpdateFailed(rideId, "Location permission denied", willRetry: false);
             return false;
         }
 
-        var cts = new CancellationTokenSource();
-
-        if (!_activeTrackers.TryAdd(rideId, cts))
+        var session = new TrackingSession
         {
-            return false; // Race condition, already added
+            RideId = rideId,
+            DestinationLatitude = destinationLatitude,
+            DestinationLongitude = destinationLongitude,
+            CurrentIntervalSeconds = LocationConfig.DefaultUpdateIntervalSeconds
+        };
+
+        if (!_activeSessions.TryAdd(rideId, session))
+        {
+            return false; // Race condition
         }
 
-        _ = Task.Run(async () => await TrackLocationLoopAsync(rideId, cts.Token), cts.Token);
+        RaiseTrackingStatusChanged(rideId, TrackingStatus.Inactive, TrackingStatus.Active, 
+            LocationConfig.TrackingActiveMessage);
+
+        // Start the tracking loop on a background task
+        _ = Task.Run(async () => await TrackLocationLoopAsync(session), session.Cts.Token);
 
         return true;
     }
 
     public async Task StopTrackingAsync(string rideId)
     {
-        if (_activeTrackers.TryRemove(rideId, out var cts))
+        if (_activeSessions.TryRemove(rideId, out var session))
         {
-            cts.Cancel();
-            cts.Dispose();
-        }
+            var oldStatus = session.Status;
+            session.Status = TrackingStatus.Inactive;
+            
+            try
+            {
+                await session.Cts.CancelAsync();
+            }
+            catch
+            {
+                // Ignore cancellation exceptions
+            }
+            finally
+            {
+                session.Cts.Dispose();
+            }
 
-        await Task.CompletedTask;
+            RaiseTrackingStatusChanged(rideId, oldStatus, TrackingStatus.Inactive, "Tracking stopped");
+        }
     }
 
     public async Task StopAllTrackingAsync()
     {
-        foreach (var kvp in _activeTrackers)
+        var rideIds = _activeSessions.Keys.ToList();
+        foreach (var rideId in rideIds)
         {
-            kvp.Value.Cancel();
-            kvp.Value.Dispose();
+            await StopTrackingAsync(rideId);
         }
-
-        _activeTrackers.Clear();
-        await Task.CompletedTask;
     }
 
     public bool IsTracking(string rideId) =>
-        _activeTrackers.ContainsKey(rideId);
+        _activeSessions.TryGetValue(rideId, out var session) && session.Status == TrackingStatus.Active;
 
-    private async Task TrackLocationLoopAsync(string rideId, CancellationToken cancellationToken)
+    public TrackingStatus GetTrackingStatus(string rideId)
     {
-        var interval = TimeSpan.FromSeconds(LocationConfig.UpdateIntervalSeconds);
-        using var timer = new PeriodicTimer(interval);
+        if (_activeSessions.TryGetValue(rideId, out var session))
+        {
+            return session.Status;
+        }
+        return TrackingStatus.Inactive;
+    }
 
+    public void UpdateDestination(string rideId, double latitude, double longitude)
+    {
+        if (_activeSessions.TryGetValue(rideId, out var session))
+        {
+            session.DestinationLatitude = latitude;
+            session.DestinationLongitude = longitude;
+            Console.WriteLine($"Updated destination for ride {rideId}: ({latitude}, {longitude})");
+        }
+    }
+
+    private async Task TrackLocationLoopAsync(TrackingSession session)
+    {
         try
         {
-            // First update immediately
-            await SendLocationUpdateAsync(rideId, cancellationToken);
+            // Send first update immediately
+            await SendLocationUpdateWithRetryAsync(session);
 
-            while (await timer.WaitForNextTickAsync(cancellationToken))
+            while (!session.Cts.Token.IsCancellationRequested)
             {
-                await SendLocationUpdateAsync(rideId, cancellationToken);
+                // Wait for the current interval
+                await Task.Delay(TimeSpan.FromSeconds(session.CurrentIntervalSeconds), session.Cts.Token);
+
+                if (session.Cts.Token.IsCancellationRequested)
+                    break;
+
+                await SendLocationUpdateWithRetryAsync(session);
             }
         }
         catch (OperationCanceledException)
         {
-            // Normal cancellation
+            // Normal cancellation - tracking was stopped
+            Console.WriteLine($"Location tracking stopped for ride {session.RideId}");
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Location tracking error for ride {rideId}: {ex.Message}");
-            LocationUpdateFailed?.Invoke(this, ex.Message);
+            Console.WriteLine($"Location tracking error for ride {session.RideId}: {ex.Message}");
+            session.Status = TrackingStatus.Error;
+            RaiseTrackingStatusChanged(session.RideId, TrackingStatus.Active, TrackingStatus.Error, ex.Message);
+            RaiseLocationUpdateFailed(session.RideId, ex.Message, willRetry: false);
         }
     }
 
-    private async Task SendLocationUpdateAsync(string rideId, CancellationToken cancellationToken)
+    private async Task SendLocationUpdateWithRetryAsync(TrackingSession session)
     {
-        try
+        var retryCount = 0;
+        var success = false;
+
+        while (retryCount <= LocationConfig.MaxRetryAttempts && !success && !session.Cts.Token.IsCancellationRequested)
         {
-            var location = await Geolocation.GetLocationAsync(new GeolocationRequest
+            try
             {
-                DesiredAccuracy = GeolocationAccuracy.Best,
-                Timeout = TimeSpan.FromSeconds(10)
-            }, cancellationToken);
+                success = await SendLocationUpdateAsync(session);
 
-            if (location == null)
-            {
-                Console.WriteLine("Failed to get location");
-                return;
-            }
-
-            var update = new LocationUpdate
-            {
-                RideId = rideId,
-                Latitude = location.Latitude,
-                Longitude = location.Longitude,
-                Timestamp = DateTime.UtcNow
-            };
-
-            var response = await _httpClient.PostAsJsonAsync("/driver/location/update", update, cancellationToken);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var statusCode = response.StatusCode;
-                Console.WriteLine($"Location update failed: {statusCode}");
-
-                if (statusCode == System.Net.HttpStatusCode.BadRequest)
+                if (success)
                 {
-                    await StopTrackingAsync(rideId);
+                    session.ConsecutiveFailures = 0;
+                    session.LastSuccessfulUpdate = DateTime.UtcNow;
+
+                    if (session.Status != TrackingStatus.Active)
+                    {
+                        var oldStatus = session.Status;
+                        session.Status = TrackingStatus.Active;
+                        RaiseTrackingStatusChanged(session.RideId, oldStatus, TrackingStatus.Active, 
+                            LocationConfig.TrackingActiveMessage);
+                    }
+                }
+                else
+                {
+                    retryCount++;
+                    if (retryCount <= LocationConfig.MaxRetryAttempts)
+                    {
+                        RaiseLocationUpdateFailed(session.RideId, "Location update failed", 
+                            willRetry: true, retryCount: retryCount);
+                        await Task.Delay(LocationConfig.RetryDelayMs, session.Cts.Token);
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                throw; // Re-throw cancellation
+            }
+            catch (Exception ex)
+            {
+                retryCount++;
+                Console.WriteLine($"Location update attempt {retryCount} failed: {ex.Message}");
+                
+                if (retryCount <= LocationConfig.MaxRetryAttempts)
+                {
+                    RaiseLocationUpdateFailed(session.RideId, ex.Message, 
+                        willRetry: true, retryCount: retryCount);
+                    await Task.Delay(LocationConfig.RetryDelayMs, session.Cts.Token);
                 }
             }
         }
-        catch (OperationCanceledException)
+
+        if (!success)
         {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error sending location update: {ex.Message}");
+            session.ConsecutiveFailures++;
+            RaiseLocationUpdateFailed(session.RideId, "Location update failed after retries", 
+                willRetry: false, retryCount: retryCount);
+
+            // If we've had multiple consecutive failures, update status
+            if (session.ConsecutiveFailures >= 3 && session.Status == TrackingStatus.Active)
+            {
+                session.Status = TrackingStatus.Error;
+                RaiseTrackingStatusChanged(session.RideId, TrackingStatus.Active, TrackingStatus.Error,
+                    "Multiple location updates failed. Check network connection.");
+            }
         }
     }
+
+    private async Task<bool> SendLocationUpdateAsync(TrackingSession session)
+    {
+        var location = await Geolocation.GetLocationAsync(new GeolocationRequest
+        {
+            DesiredAccuracy = GeolocationAccuracy.Best,
+            Timeout = TimeSpan.FromSeconds(LocationConfig.LocationTimeoutSeconds)
+        }, session.Cts.Token);
+
+        if (location == null)
+        {
+            Console.WriteLine("Failed to get location from device");
+            return false;
+        }
+
+        // Calculate dynamic interval based on proximity to destination
+        UpdateIntervalBasedOnProximity(session, location.Latitude, location.Longitude);
+
+        var update = new LocationUpdate
+        {
+            RideId = session.RideId,
+            Latitude = location.Latitude,
+            Longitude = location.Longitude,
+            Timestamp = DateTime.UtcNow,
+            Heading = location.Course,  // Course is the heading in degrees
+            Speed = location.Speed,      // Speed in meters/second
+            Accuracy = location.Accuracy
+        };
+
+        var response = await _httpClient.PostAsJsonAsync("/driver/location/update", update, session.Cts.Token);
+
+        if (response.IsSuccessStatusCode)
+        {
+            Console.WriteLine($"Location sent for ride {session.RideId}: ({location.Latitude}, {location.Longitude})");
+            
+            LocationSent?.Invoke(this, new LocationSentEventArgs
+            {
+                RideId = session.RideId,
+                Latitude = location.Latitude,
+                Longitude = location.Longitude,
+                Timestamp = update.Timestamp,
+                CurrentIntervalSeconds = session.CurrentIntervalSeconds
+            });
+            
+            return true;
+        }
+
+        var statusCode = response.StatusCode;
+        Console.WriteLine($"Location update failed with status: {statusCode}");
+
+        // If we get a 400 Bad Request, the ride may be invalid - stop tracking
+        if (statusCode == System.Net.HttpStatusCode.BadRequest)
+        {
+            Console.WriteLine($"Stopping tracking for ride {session.RideId} due to bad request");
+            _ = StopTrackingAsync(session.RideId);
+        }
+        // If we get 401 Unauthorized, token may have expired
+        else if (statusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            session.Status = TrackingStatus.Error;
+            RaiseTrackingStatusChanged(session.RideId, TrackingStatus.Active, TrackingStatus.Error,
+                "Authentication failed. Please log in again.");
+        }
+
+        return false;
+    }
+
+    private void UpdateIntervalBasedOnProximity(TrackingSession session, double currentLat, double currentLon)
+    {
+        if (!session.DestinationLatitude.HasValue || !session.DestinationLongitude.HasValue)
+        {
+            session.CurrentIntervalSeconds = LocationConfig.DefaultUpdateIntervalSeconds;
+            return;
+        }
+
+        var distance = CalculateDistanceMeters(
+            currentLat, currentLon,
+            session.DestinationLatitude.Value, session.DestinationLongitude.Value);
+
+        var previousInterval = session.CurrentIntervalSeconds;
+
+        // Use faster updates when close to destination
+        session.CurrentIntervalSeconds = distance <= LocationConfig.ProximityDistanceMeters
+            ? LocationConfig.ProximityUpdateIntervalSeconds
+            : LocationConfig.DefaultUpdateIntervalSeconds;
+
+        if (previousInterval != session.CurrentIntervalSeconds)
+        {
+            Console.WriteLine($"Update interval changed to {session.CurrentIntervalSeconds}s " +
+                             $"(distance: {distance:F0}m)");
+        }
+    }
+
+    /// <summary>
+    /// Calculates the distance between two coordinates using the Haversine formula
+    /// </summary>
+    private static double CalculateDistanceMeters(double lat1, double lon1, double lat2, double lon2)
+    {
+        const double EarthRadiusMeters = 6371000;
+
+        var dLat = DegreesToRadians(lat2 - lat1);
+        var dLon = DegreesToRadians(lon2 - lon1);
+
+        var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) +
+                Math.Cos(DegreesToRadians(lat1)) * Math.Cos(DegreesToRadians(lat2)) *
+                Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+
+        var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+
+        return EarthRadiusMeters * c;
+    }
+
+    private static double DegreesToRadians(double degrees) => degrees * Math.PI / 180;
 
     private async Task<PermissionStatus> CheckAndRequestLocationPermission()
     {
@@ -159,7 +364,55 @@ public class LocationTracker : ILocationTracker
             return status;
         }
 
+        // Show rationale if available
+        if (Permissions.ShouldShowRationale<Permissions.LocationWhenInUse>())
+        {
+            await MainThread.InvokeOnMainThreadAsync(async () =>
+            {
+                await Shell.Current.DisplayAlert(
+                    "Location Permission Required",
+                    LocationConfig.PermissionRationale,
+                    "OK");
+            });
+        }
+
         status = await Permissions.RequestAsync<Permissions.LocationWhenInUse>();
+        
+        // Also request background location for continuous tracking
+        if (status == PermissionStatus.Granted)
+        {
+            var bgStatus = await Permissions.CheckStatusAsync<Permissions.LocationAlways>();
+            if (bgStatus != PermissionStatus.Granted)
+            {
+                // On Android, we can request "always" permission for background tracking
+                // This helps when the app is minimized during a ride
+                bgStatus = await Permissions.RequestAsync<Permissions.LocationAlways>();
+                Console.WriteLine($"Background location permission: {bgStatus}");
+            }
+        }
+        
         return status;
+    }
+
+    private void RaiseLocationUpdateFailed(string rideId, string message, bool willRetry, int retryCount = 0)
+    {
+        LocationUpdateFailed?.Invoke(this, new LocationUpdateFailedEventArgs
+        {
+            RideId = rideId,
+            ErrorMessage = message,
+            WillRetry = willRetry,
+            RetryCount = retryCount
+        });
+    }
+
+    private void RaiseTrackingStatusChanged(string rideId, TrackingStatus oldStatus, TrackingStatus newStatus, string? message = null)
+    {
+        TrackingStatusChanged?.Invoke(this, new TrackingStatusChangedEventArgs
+        {
+            RideId = rideId,
+            OldStatus = oldStatus,
+            NewStatus = newStatus,
+            Message = message
+        });
     }
 }

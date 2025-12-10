@@ -92,6 +92,23 @@ public sealed class LocationUpdate
     public double Latitude { get; set; }
     public double Longitude { get; set; }
     public DateTime Timestamp { get; set; }
+    
+    /// <summary>
+    /// Direction of travel in degrees (0-360, where 0 is North)
+    /// Optional - may be null if device doesn't provide heading
+    /// </summary>
+    public double? Heading { get; set; }
+    
+    /// <summary>
+    /// Current speed in meters per second
+    /// Optional - may be null if device doesn't provide speed
+    /// </summary>
+    public double? Speed { get; set; }
+    
+    /// <summary>
+    /// Accuracy of the location reading in meters
+    /// </summary>
+    public double? Accuracy { get; set; }
 }
 
 /// <summary>
