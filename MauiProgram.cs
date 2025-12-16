@@ -39,8 +39,9 @@ public static class MauiProgram
         builder.Services.AddSingleton<IRideService, RideService>();
         builder.Services.AddSingleton<ILocationTracker, LocationTracker>();
 
-        // Auth handler for protected AdminAPI calls
+        // HTTP Message Handlers
         builder.Services.AddTransient<AuthHttpHandler>();
+        builder.Services.AddTransient<TimezoneHttpHandler>();
 
         // ===== HTTP CLIENTS =====
 
@@ -57,6 +58,7 @@ public static class MauiProgram
             c.DefaultRequestHeaders.Accept.Add(
                 new MediaTypeWithQualityHeaderValue("application/json"));
         })
+        .AddHttpMessageHandler<TimezoneHttpHandler>()  // Add timezone header
 #if DEBUG
         .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
         {
@@ -81,7 +83,8 @@ public static class MauiProgram
             c.DefaultRequestHeaders.Accept.Add(
                 new MediaTypeWithQualityHeaderValue("application/json"));
         })
-        .AddHttpMessageHandler<AuthHttpHandler>()
+        .AddHttpMessageHandler<TimezoneHttpHandler>()  // Add timezone header first
+        .AddHttpMessageHandler<AuthHttpHandler>()       // Then add auth header
 #if DEBUG
         .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
         {

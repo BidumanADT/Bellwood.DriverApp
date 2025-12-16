@@ -25,6 +25,7 @@ public class LocationTracker : ILocationTracker
     {
         public required string RideId { get; init; }
         public CancellationTokenSource Cts { get; } = new();
+        public Task? TrackingTask { get; set; }
         public TrackingStatus Status { get; set; } = TrackingStatus.Active;
         public double? DestinationLatitude { get; set; }
         public double? DestinationLongitude { get; set; }
@@ -76,8 +77,8 @@ public class LocationTracker : ILocationTracker
         RaiseTrackingStatusChanged(rideId, TrackingStatus.Inactive, TrackingStatus.Active, 
             LocationConfig.TrackingActiveMessage);
 
-        // Start the tracking loop on a background task
-        _ = Task.Run(async () => await TrackLocationLoopAsync(session), session.Cts.Token);
+        // Start the tracking loop and store the task reference
+        session.TrackingTask = Task.Run(async () => await TrackLocationLoopAsync(session), session.Cts.Token);
 
         return true;
     }
@@ -91,14 +92,36 @@ public class LocationTracker : ILocationTracker
             
             try
             {
+                // Cancel the token to signal the loop to stop
+#if NET8_0_OR_GREATER
                 await session.Cts.CancelAsync();
+#else
+                session.Cts.Cancel();
+#endif
+                
+                // Wait for the tracking task to complete (with timeout to prevent hanging)
+                if (session.TrackingTask != null)
+                {
+                    var timeoutTask = Task.Delay(TimeSpan.FromSeconds(5));
+                    var completedTask = await Task.WhenAny(session.TrackingTask, timeoutTask);
+                    
+                    if (completedTask == timeoutTask)
+                    {
+                        Console.WriteLine($"Warning: Tracking task for ride {rideId} did not complete within timeout");
+                    }
+                }
             }
-            catch
+            catch (OperationCanceledException)
             {
-                // Ignore cancellation exceptions
+                // Expected when cancellation occurs
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error stopping tracking for ride {rideId}: {ex.Message}");
             }
             finally
             {
+                // Now it's safe to dispose the CTS
                 session.Cts.Dispose();
             }
 
@@ -141,7 +164,11 @@ public class LocationTracker : ILocationTracker
     {
         try
         {
-            // Send first update immediately
+            // Add a small delay before the first update to allow server status change to propagate
+            // This prevents race condition where server hasn't processed the OnRoute status yet
+            await Task.Delay(TimeSpan.FromSeconds(2), session.Cts.Token);
+            
+            // Send first update
             await SendLocationUpdateWithRetryAsync(session);
 
             while (!session.Cts.Token.IsCancellationRequested)
@@ -287,18 +314,25 @@ public class LocationTracker : ILocationTracker
         var statusCode = response.StatusCode;
         Console.WriteLine($"Location update failed with status: {statusCode}");
 
-        // If we get a 400 Bad Request, the ride may be invalid - stop tracking
+        // Handle specific error cases
         if (statusCode == System.Net.HttpStatusCode.BadRequest)
         {
-            Console.WriteLine($"Stopping tracking for ride {session.RideId} due to bad request");
-            _ = StopTrackingAsync(session.RideId);
+            // 400 could mean ride status not yet propagated or ride ended
+            // Don't stop immediately - let retry logic handle it
+            // After multiple failures, tracking will be marked as error
+            Console.WriteLine($"Bad request for ride {session.RideId} - ride may not be in active status yet");
         }
-        // If we get 401 Unauthorized, token may have expired
         else if (statusCode == System.Net.HttpStatusCode.Unauthorized)
         {
+            // 401 means auth token expired - mark as error
             session.Status = TrackingStatus.Error;
             RaiseTrackingStatusChanged(session.RideId, TrackingStatus.Active, TrackingStatus.Error,
                 "Authentication failed. Please log in again.");
+        }
+        else if (statusCode == System.Net.HttpStatusCode.TooManyRequests)
+        {
+            // 429 means we're sending too fast - this is okay, just log it
+            Console.WriteLine($"Rate limit hit for ride {session.RideId} - will retry after interval");
         }
 
         return false;
