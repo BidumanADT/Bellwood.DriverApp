@@ -25,7 +25,7 @@
                            FontSize="24"
                            FontAttributes="Bold"
                            TextColor="White"/>
-                    <Label Text="{Binding Ride.PickupDateTime, StringFormat='Pick up: {0:MMM dd, yyyy h:mm tt}'}"
+                    <Label Text="{Binding Ride.DisplayPickupTime, StringFormat='Pick up: {0:MMM dd, yyyy h:mm tt}'}"
                            FontSize="16"
                            TextColor="White"/>
                     <Label Text="{Binding Ride.Status}"

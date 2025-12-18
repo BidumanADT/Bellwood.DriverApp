@@ -8,17 +8,22 @@ namespace Bellwood.DriverApp.Handlers;
 public class TimezoneHttpHandler : DelegatingHandler
 {
     private readonly string _timezoneId;
+    private readonly TimeSpan _utcOffset;
 
     public TimezoneHttpHandler()
     {
         // Get the device's current timezone
         _timezoneId = TimeZoneInfo.Local.Id;
+        _utcOffset = TimeZoneInfo.Local.GetUtcOffset(DateTime.UtcNow);
         
         // Log timezone detection for debugging
-        var offset = TimeZoneInfo.Local.GetUtcOffset(DateTime.UtcNow);
-        Console.WriteLine($"?? Device Timezone ID: {_timezoneId}");
-        Console.WriteLine($"? Current UTC Offset: {offset.TotalHours:+0.0;-0.0} hours");
-        Console.WriteLine($"?? Current Local Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        Console.WriteLine("???????????????????????????????????????????????????");
+        Console.WriteLine("?? TIMEZONE DETECTION");
+        Console.WriteLine($"   Device Timezone ID: {_timezoneId}");
+        Console.WriteLine($"   Current UTC Offset: {_utcOffset.TotalHours:+0.0;-0.0} hours");
+        Console.WriteLine($"   Current Local Time: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        Console.WriteLine($"   Current UTC Time:   {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}");
+        Console.WriteLine("???????????????????????????????????????????????????");
     }
 
     protected override async Task<HttpResponseMessage> SendAsync(
@@ -33,11 +38,24 @@ public class TimezoneHttpHandler : DelegatingHandler
         }
 
 #if DEBUG
-        // Log in debug mode to verify header is being sent
-        Console.WriteLine($"?? Request: {request.Method} {request.RequestUri?.PathAndQuery}");
-        Console.WriteLine($"?? Timezone Header: {_timezoneId}");
+        // Enhanced logging in debug mode to verify header is being sent
+        Console.WriteLine($"?? API Request: {request.Method} {request.RequestUri?.PathAndQuery}");
+        Console.WriteLine($"   ?? X-Timezone-Id: {_timezoneId}");
+        
+        // Log auth header presence (not the actual token for security)
+        var hasAuthHeader = request.Headers.Contains("Authorization");
+        Console.WriteLine($"   ?? Authorization: {(hasAuthHeader ? "Present" : "Missing")}");
 #endif
 
-        return await base.SendAsync(request, cancellationToken);
+        var response = await base.SendAsync(request, cancellationToken);
+
+#if DEBUG
+        // Log response status for debugging
+        var statusEmoji = response.IsSuccessStatusCode ? "?" : "?";
+        Console.WriteLine($"{statusEmoji} Response: {(int)response.StatusCode} {response.StatusCode}");
+        Console.WriteLine("?????????????????????????????????????????????????");
+#endif
+
+        return response;
     }
 }
