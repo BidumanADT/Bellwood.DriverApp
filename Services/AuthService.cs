@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.IdentityModel.Tokens.Jwt;
 using Bellwood.DriverApp.Models;
 
 namespace Bellwood.DriverApp.Services;
@@ -7,11 +8,13 @@ namespace Bellwood.DriverApp.Services;
 /// <summary>
 /// Implementation of authentication service using SecureStorage for token management.
 /// Uses the named "auth" HttpClient configured in MauiProgram.
+/// Enhanced with token validation and expiration checking.
 /// </summary>
 public class AuthService : IAuthService
 {
     private readonly HttpClient _httpClient;
     private const string AccessTokenKey = "bellwood_access_token";
+    private const string TokenExpiryKey = "bellwood_token_expiry";
 
     public AuthService(IHttpClientFactory httpClientFactory)
     {
@@ -44,6 +47,15 @@ public class AuthService : IAuthService
 
             // Store token securely
             await SecureStorage.SetAsync(AccessTokenKey, loginResponse.AccessToken);
+            
+            // Extract and store token expiration
+            var expiry = GetTokenExpiration(loginResponse.AccessToken);
+            if (expiry.HasValue)
+            {
+                await SecureStorage.SetAsync(TokenExpiryKey, expiry.Value.ToString("O"));
+                Console.WriteLine($"?? Token stored, expires: {expiry.Value:yyyy-MM-dd HH:mm:ss}");
+            }
+            
             return (true, null);
         }
         catch (HttpRequestException ex)
@@ -59,6 +71,8 @@ public class AuthService : IAuthService
     public async Task SignOutAsync()
     {
         SecureStorage.Remove(AccessTokenKey);
+        SecureStorage.Remove(TokenExpiryKey);
+        Console.WriteLine($"?? User signed out - tokens cleared");
         await Task.CompletedTask;
     }
 
@@ -66,10 +80,27 @@ public class AuthService : IAuthService
     {
         try
         {
-            return await SecureStorage.GetAsync(AccessTokenKey);
+            var token = await SecureStorage.GetAsync(AccessTokenKey);
+            
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                Console.WriteLine($"?? [AuthService] No token in SecureStorage");
+                return null;
+            }
+            
+            // Check if token is expired
+            if (await IsTokenExpiredAsync())
+            {
+                Console.WriteLine($"? [AuthService] Token expired - clearing from storage");
+                await SignOutAsync();
+                return null;
+            }
+            
+            return token;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"? [AuthService] Error retrieving token: {ex.Message}");
             return null;
         }
     }
@@ -77,6 +108,69 @@ public class AuthService : IAuthService
     public async Task<bool> IsAuthenticatedAsync()
     {
         var token = await GetAccessTokenAsync();
-        return !string.IsNullOrWhiteSpace(token);
+        var isAuthenticated = !string.IsNullOrWhiteSpace(token);
+        
+#if DEBUG
+        Console.WriteLine($"?? [AuthService] IsAuthenticated: {isAuthenticated}");
+#endif
+        
+        return isAuthenticated;
+    }
+
+    /// <summary>
+    /// Checks if the current token is expired
+    /// </summary>
+    private async Task<bool> IsTokenExpiredAsync()
+    {
+        try
+        {
+            var expiryStr = await SecureStorage.GetAsync(TokenExpiryKey);
+            if (string.IsNullOrWhiteSpace(expiryStr))
+            {
+                // No expiry stored, assume token is valid
+                return false;
+            }
+
+            if (DateTime.TryParse(expiryStr, out var expiry))
+            {
+                // Add 1 minute buffer to prevent edge-case failures
+                var isExpired = DateTime.UtcNow >= expiry.AddMinutes(-1);
+                
+                if (isExpired)
+                {
+                    Console.WriteLine($"? Token expired at {expiry:yyyy-MM-dd HH:mm:ss} UTC");
+                }
+                
+                return isExpired;
+            }
+
+            return false;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Extracts the expiration time from a JWT token
+    /// </summary>
+    private DateTime? GetTokenExpiration(string token)
+    {
+        try
+        {
+            var handler = new JwtSecurityTokenHandler();
+            var jwtToken = handler.ReadJwtToken(token);
+            
+            // JWT exp claim is in Unix timestamp (seconds since epoch)
+            var exp = jwtToken.ValidTo;
+            
+            return exp;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"?? Failed to parse token expiration: {ex.Message}");
+            return null;
+        }
     }
 }

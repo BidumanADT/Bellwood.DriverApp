@@ -4,6 +4,7 @@ namespace Bellwood.DriverApp.Handlers;
 /// HTTP message handler that automatically injects the device's timezone
 /// into all API requests via the X-Timezone-Id header.
 /// This enables the backend to return rides in the driver's local timezone.
+/// IMPORTANT: This handler runs BEFORE AuthHttpHandler in the pipeline.
 /// </summary>
 public class TimezoneHttpHandler : DelegatingHandler
 {
@@ -38,21 +39,28 @@ public class TimezoneHttpHandler : DelegatingHandler
         }
 
 #if DEBUG
-        // Enhanced logging in debug mode to verify header is being sent
-        Console.WriteLine($"?? API Request: {request.Method} {request.RequestUri?.PathAndQuery}");
+        // Log request details BEFORE passing to next handler (AuthHttpHandler)
+        Console.WriteLine($"?? [TimezoneHttpHandler] Request: {request.Method} {request.RequestUri?.PathAndQuery}");
         Console.WriteLine($"   ?? X-Timezone-Id: {_timezoneId}");
-        
-        // Log auth header presence (not the actual token for security)
-        var hasAuthHeader = request.Headers.Contains("Authorization");
-        Console.WriteLine($"   ?? Authorization: {(hasAuthHeader ? "Present" : "Missing")}");
 #endif
 
+        // Pass to next handler (AuthHttpHandler will add Authorization header)
         var response = await base.SendAsync(request, cancellationToken);
 
 #if DEBUG
-        // Log response status for debugging
+        // Log response status and check if auth header was added by subsequent handlers
         var statusEmoji = response.IsSuccessStatusCode ? "?" : "?";
+        var hasAuthHeader = request.Headers.Authorization != null;
+        
         Console.WriteLine($"{statusEmoji} Response: {(int)response.StatusCode} {response.StatusCode}");
+        Console.WriteLine($"   ?? Authorization: {(hasAuthHeader ? "Present ?" : "Missing ??")}");
+        
+        if (!hasAuthHeader && response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            Console.WriteLine($"   ?? WARNING: 401 response with missing Authorization header!");
+            Console.WriteLine($"   This suggests AuthHttpHandler did not add the token.");
+        }
+        
         Console.WriteLine("?????????????????????????????????????????????????");
 #endif
 
