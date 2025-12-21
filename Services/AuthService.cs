@@ -48,12 +48,16 @@ public class AuthService : IAuthService
             // Store token securely
             await SecureStorage.SetAsync(AccessTokenKey, loginResponse.AccessToken);
             
-            // Extract and store token expiration
+            // Extract and store token expiration (as Unix timestamp for accuracy)
             var expiry = GetTokenExpiration(loginResponse.AccessToken);
             if (expiry.HasValue)
             {
-                await SecureStorage.SetAsync(TokenExpiryKey, expiry.Value.ToString("O"));
-                Console.WriteLine($"?? Token stored, expires: {expiry.Value:yyyy-MM-dd HH:mm:ss}");
+                // Store as Unix timestamp (seconds since epoch) to avoid DateTime parsing issues
+                var unixTimestamp = new DateTimeOffset(expiry.Value).ToUnixTimeSeconds();
+                await SecureStorage.SetAsync(TokenExpiryKey, unixTimestamp.ToString());
+                
+                Console.WriteLine($"?? Token stored, expires: {expiry.Value:yyyy-MM-dd HH:mm:ss} UTC");
+                Console.WriteLine($"    Unix timestamp: {unixTimestamp}");
             }
             
             return (true, null);
@@ -127,14 +131,27 @@ public class AuthService : IAuthService
             var expiryStr = await SecureStorage.GetAsync(TokenExpiryKey);
             if (string.IsNullOrWhiteSpace(expiryStr))
             {
+                Console.WriteLine($"?? [AuthService] No expiry timestamp in storage");
                 // No expiry stored, assume token is valid
                 return false;
             }
 
-            if (DateTime.TryParse(expiryStr, out var expiry))
+            if (long.TryParse(expiryStr, out var unixTimestamp))
             {
+                // Convert Unix timestamp back to DateTime UTC
+                var expiry = DateTimeOffset.FromUnixTimeSeconds(unixTimestamp).UtcDateTime;
+                var now = DateTime.UtcNow;
+                
                 // Add 1 minute buffer to prevent edge-case failures
-                var isExpired = DateTime.UtcNow >= expiry.AddMinutes(-1);
+                var isExpired = now >= expiry.AddMinutes(-1);
+                
+#if DEBUG
+                Console.WriteLine($"?? [AuthService] Expiry check:");
+                Console.WriteLine($"    Token expires: {expiry:yyyy-MM-dd HH:mm:ss} UTC");
+                Console.WriteLine($"    Current time:  {now:yyyy-MM-dd HH:mm:ss} UTC");
+                Console.WriteLine($"    Time until expiry: {(expiry - now).TotalMinutes:F1} minutes");
+                Console.WriteLine($"    Is expired: {isExpired}");
+#endif
                 
                 if (isExpired)
                 {
@@ -144,10 +161,12 @@ public class AuthService : IAuthService
                 return isExpired;
             }
 
+            Console.WriteLine($"?? [AuthService] Failed to parse expiry timestamp: {expiryStr}");
             return false;
         }
-        catch
+        catch (Exception ex)
         {
+            Console.WriteLine($"? [AuthService] Error checking expiration: {ex.Message}");
             return false;
         }
     }
@@ -162,8 +181,13 @@ public class AuthService : IAuthService
             var handler = new JwtSecurityTokenHandler();
             var jwtToken = handler.ReadJwtToken(token);
             
-            // JWT exp claim is in Unix timestamp (seconds since epoch)
+            // JWT ValidTo is always in UTC
             var exp = jwtToken.ValidTo;
+            
+            Console.WriteLine($"?? [AuthService] Parsed JWT token:");
+            Console.WriteLine($"    Issued at: {jwtToken.ValidFrom:yyyy-MM-dd HH:mm:ss} UTC");
+            Console.WriteLine($"    Expires:   {exp:yyyy-MM-dd HH:mm:ss} UTC");
+            Console.WriteLine($"    Lifetime:  {(exp - jwtToken.ValidFrom).TotalHours:F1} hours");
             
             return exp;
         }
