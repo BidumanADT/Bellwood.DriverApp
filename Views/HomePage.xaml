@@ -57,7 +57,7 @@
 
                                 <!-- Pickup Time -->
                                 <Label Grid.Row="0" Grid.Column="0"
-                                       Text="{Binding PickupDateTime, StringFormat='{0:MMM dd, h:mm tt}'}"
+                                       Text="{Binding DisplayPickupTime, StringFormat='{0:MMM dd, h:mm tt}'}"
                                        FontSize="16"
                                        FontAttributes="Bold"
                                        TextColor="{StaticResource Primary}"/>

@@ -2,9 +2,14 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:viewmodels="clr-namespace:Bellwood.DriverApp.ViewModels"
+             xmlns:helpers="clr-namespace:Bellwood.DriverApp.Helpers"
              x:Class="Bellwood.DriverApp.Views.RideDetailPage"
              x:DataType="viewmodels:RideDetailViewModel"
              Title="{Binding Title}">
+
+    <ContentPage.Resources>
+        <helpers:BoolToGpsIconConverter x:Key="BoolToGpsIconConverter"/>
+    </ContentPage.Resources>
 
     <ScrollView>
         <VerticalStackLayout Spacing="0" Padding="0">
@@ -20,7 +25,7 @@
                            FontSize="24"
                            FontAttributes="Bold"
                            TextColor="White"/>
-                    <Label Text="{Binding Ride.PickupDateTime, StringFormat='Pick up: {0:MMM dd, yyyy h:mm tt}'}"
+                    <Label Text="{Binding Ride.DisplayPickupTime, StringFormat='Pick up: {0:MMM dd, yyyy h:mm tt}'}"
                            FontSize="16"
                            TextColor="White"/>
                     <Label Text="{Binding Ride.Status}"
@@ -31,19 +36,48 @@
                 </VerticalStackLayout>
             </Frame>
 
-            <!-- Location Tracking Indicator -->
-            <Frame IsVisible="{Binding IsTracking}"
-                   BackgroundColor="{StaticResource Success}"
+            <!-- Enhanced Location Tracking Indicator -->
+            <Frame IsVisible="{Binding ShowTrackingIndicator}"
                    Margin="10"
-                   Padding="10"
+                   Padding="12"
                    CornerRadius="8"
-                   HasShadow="False">
-                <HorizontalStackLayout Spacing="10">
-                    <Label Text="📍" FontSize="16"/>
-                    <Label Text="Location tracking active"
-                           TextColor="White"
-                           FontAttributes="Bold"/>
-                </HorizontalStackLayout>
+                   HasShadow="False"
+                   BackgroundColor="{StaticResource Gray400}">
+                <Frame.Triggers>
+                    <DataTrigger TargetType="Frame" Binding="{Binding HasTrackingError}" Value="True">
+                        <Setter Property="BackgroundColor" Value="{StaticResource Warning}"/>
+                    </DataTrigger>
+                    <DataTrigger TargetType="Frame" Binding="{Binding IsTracking}" Value="True">
+                        <Setter Property="BackgroundColor" Value="{StaticResource Success}"/>
+                    </DataTrigger>
+                </Frame.Triggers>
+                <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                    <!-- GPS Icon -->
+                    <Label Grid.Column="0" 
+                           Text="{Binding IsTracking, Converter={StaticResource BoolToGpsIconConverter}}"
+                           FontSize="18"
+                           VerticalOptions="Center"/>
+                    
+                    <!-- Status Message -->
+                    <VerticalStackLayout Grid.Column="1" VerticalOptions="Center">
+                        <Label Text="{Binding TrackingStatusMessage}"
+                               TextColor="White"
+                               FontAttributes="Bold"
+                               FontSize="14"/>
+                        <Label Text="Your location is visible to the passenger"
+                               TextColor="White"
+                               FontSize="11"
+                               Opacity="0.85"
+                               IsVisible="{Binding IsTracking}"/>
+                    </VerticalStackLayout>
+                    
+                    <!-- Error indicator -->
+                    <Label Grid.Column="2"
+                           Text="⚠️"
+                           FontSize="18"
+                           VerticalOptions="Center"
+                           IsVisible="{Binding HasTrackingError}"/>
+                </Grid>
             </Frame>
 
             <!-- Passenger Info -->

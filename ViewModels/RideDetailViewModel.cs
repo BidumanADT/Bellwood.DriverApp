@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Bellwood.DriverApp.Models;
 using Bellwood.DriverApp.Services;
+using Bellwood.DriverApp.Helpers;
 
 namespace Bellwood.DriverApp.ViewModels;
 
@@ -22,6 +23,15 @@ public partial class RideDetailViewModel : BaseViewModel
 
     [ObservableProperty]
     private bool _isTracking;
+
+    [ObservableProperty]
+    private string _trackingStatusMessage = string.Empty;
+
+    [ObservableProperty]
+    private bool _hasTrackingError;
+
+    [ObservableProperty]
+    private bool _showTrackingIndicator;
 
     // Computed visibility properties for status buttons
     [ObservableProperty]
@@ -44,6 +54,11 @@ public partial class RideDetailViewModel : BaseViewModel
         _rideService = rideService;
         _locationTracker = locationTracker;
         this.Title = "Ride Details";
+
+        // Subscribe to location tracking events
+        _locationTracker.TrackingStatusChanged += OnTrackingStatusChanged;
+        _locationTracker.LocationUpdateFailed += OnLocationUpdateFailed;
+        _locationTracker.LocationSent += OnLocationSent;
     }
 
     partial void OnRideIdChanged(string? value)
@@ -57,6 +72,7 @@ public partial class RideDetailViewModel : BaseViewModel
     partial void OnRideChanged(DriverRideDetailDto? value)
     {
         UpdateCanTransitionProperties();
+        UpdateTrackingIndicator();
     }
 
     private void UpdateCanTransitionProperties()
@@ -66,6 +82,44 @@ public partial class RideDetailViewModel : BaseViewModel
         CanTransitionToPassengerOnboard = Ride?.Status == RideStatus.Arrived;
         CanTransitionToCompleted = Ride?.Status == RideStatus.PassengerOnboard;
         CanCancel = Ride != null && Ride.Status != RideStatus.Completed && Ride.Status != RideStatus.Cancelled;
+    }
+
+    private void UpdateTrackingIndicator()
+    {
+        if (string.IsNullOrEmpty(RideId) || Ride == null)
+        {
+            ShowTrackingIndicator = false;
+            return;
+        }
+
+        // Show tracking indicator only for active ride statuses
+        var isActiveRide = Ride.Status == RideStatus.OnRoute || 
+                          Ride.Status == RideStatus.Arrived || 
+                          Ride.Status == RideStatus.PassengerOnboard;
+
+        ShowTrackingIndicator = isActiveRide;
+        IsTracking = _locationTracker.IsTracking(RideId);
+
+        if (isActiveRide && IsTracking)
+        {
+            TrackingStatusMessage = LocationConfig.TrackingActiveMessage;
+            HasTrackingError = false;
+        }
+        else if (isActiveRide && !IsTracking)
+        {
+            // Tracking should be active but isn't
+            var status = _locationTracker.GetTrackingStatus(RideId);
+            if (status == TrackingStatus.PermissionRequired)
+            {
+                TrackingStatusMessage = LocationConfig.GpsUnavailableMessage;
+                HasTrackingError = true;
+            }
+            else
+            {
+                TrackingStatusMessage = "Location tracking inactive";
+                HasTrackingError = true;
+            }
+        }
     }
 
     private async Task LoadRideDetailsAsync()
@@ -89,8 +143,17 @@ public partial class RideDetailViewModel : BaseViewModel
             // Update title with passenger name
             this.Title = $"Ride for {this.Ride.PassengerName}";
 
-            // Check if location tracking is active
+            // Check if location tracking is active and update status
             this.IsTracking = _locationTracker.IsTracking(this.RideId);
+            UpdateTrackingIndicator();
+
+            // If the ride is already in an active state, ensure tracking is started
+            if (Ride.Status == RideStatus.OnRoute || 
+                Ride.Status == RideStatus.Arrived || 
+                Ride.Status == RideStatus.PassengerOnboard)
+            {
+                await ResumeTrackingIfNeeded();
+            }
         }
         catch (Exception ex)
         {
@@ -100,6 +163,65 @@ public partial class RideDetailViewModel : BaseViewModel
         {
             this.IsBusy = false;
         }
+    }
+
+    /// <summary>
+    /// Resumes tracking if it should be active but isn't (e.g., after app restart)
+    /// </summary>
+    private async Task ResumeTrackingIfNeeded()
+    {
+        if (string.IsNullOrEmpty(RideId) || Ride == null)
+            return;
+
+        if (!_locationTracker.IsTracking(RideId))
+        {
+            // Determine destination coordinates based on current status
+            var (destLat, destLon) = await GetDestinationCoordinatesAsync();
+            
+            var started = await _locationTracker.StartTrackingAsync(RideId, destLat, destLon);
+            IsTracking = started;
+            UpdateTrackingIndicator();
+
+            if (!started)
+            {
+                Console.WriteLine($"Failed to resume tracking for ride {RideId}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Gets destination coordinates for proximity-based tracking
+    /// Returns pickup coords when OnRoute, dropoff coords when PassengerOnboard
+    /// </summary>
+    private async Task<(double? lat, double? lon)> GetDestinationCoordinatesAsync()
+    {
+        if (Ride == null)
+            return (null, null);
+
+        try
+        {
+            string targetAddress = Ride.Status switch
+            {
+                RideStatus.OnRoute or RideStatus.Arrived => Ride.PickupLocation,
+                RideStatus.PassengerOnboard => Ride.DropoffLocation,
+                _ => Ride.PickupLocation
+            };
+
+            // Try to geocode the address to get coordinates
+            var locations = await Geocoding.GetLocationsAsync(targetAddress);
+            var location = locations?.FirstOrDefault();
+
+            if (location != null)
+            {
+                return (location.Latitude, location.Longitude);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to geocode destination: {ex.Message}");
+        }
+
+        return (null, null);
     }
 
     [RelayCommand]
@@ -168,8 +290,10 @@ public partial class RideDetailViewModel : BaseViewModel
         {
             if (!this.IsTracking)
             {
-                var started = await _locationTracker.StartTrackingAsync(this.RideId);
+                var (destLat, destLon) = await GetDestinationCoordinatesAsync();
+                var started = await _locationTracker.StartTrackingAsync(this.RideId, destLat, destLon);
                 this.IsTracking = started;
+                UpdateTrackingIndicator();
 
                 if (!started)
                 {
@@ -179,13 +303,73 @@ public partial class RideDetailViewModel : BaseViewModel
                         "OK");
                 }
             }
+            else if (status == RideStatus.PassengerOnboard)
+            {
+                // Update destination to dropoff location when passenger is onboard
+                var (destLat, destLon) = await GetDestinationCoordinatesAsync();
+                if (destLat.HasValue && destLon.HasValue)
+                {
+                    _locationTracker.UpdateDestination(this.RideId, destLat.Value, destLon.Value);
+                }
+            }
         }
         // Stop tracking when ride is completed or cancelled
         else if (status == RideStatus.Completed || status == RideStatus.Cancelled)
         {
             await _locationTracker.StopTrackingAsync(this.RideId);
             this.IsTracking = false;
+            UpdateTrackingIndicator();
         }
+    }
+
+    private void OnTrackingStatusChanged(object? sender, TrackingStatusChangedEventArgs e)
+    {
+        if (e.RideId != RideId)
+            return;
+
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            IsTracking = e.NewStatus == TrackingStatus.Active;
+            HasTrackingError = e.NewStatus == TrackingStatus.Error || e.NewStatus == TrackingStatus.PermissionRequired;
+            
+            if (!string.IsNullOrEmpty(e.Message))
+            {
+                TrackingStatusMessage = e.Message;
+            }
+
+            UpdateTrackingIndicator();
+        });
+    }
+
+    private void OnLocationUpdateFailed(object? sender, LocationUpdateFailedEventArgs e)
+    {
+        if (e.RideId != RideId)
+            return;
+
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            if (!e.WillRetry)
+            {
+                HasTrackingError = true;
+                TrackingStatusMessage = $"Location update failed: {e.ErrorMessage}";
+            }
+        });
+    }
+
+    private void OnLocationSent(object? sender, LocationSentEventArgs e)
+    {
+        if (e.RideId != RideId)
+            return;
+
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            // Reset error state on successful send
+            if (HasTrackingError)
+            {
+                HasTrackingError = false;
+                TrackingStatusMessage = LocationConfig.TrackingActiveMessage;
+            }
+        });
     }
 
     [RelayCommand]
@@ -236,5 +420,15 @@ public partial class RideDetailViewModel : BaseViewModel
             RideStatus.Cancelled => "Cancelled",
             _ => status.ToString()
         };
+    }
+
+    /// <summary>
+    /// Cleanup event subscriptions
+    /// </summary>
+    public void Cleanup()
+    {
+        _locationTracker.TrackingStatusChanged -= OnTrackingStatusChanged;
+        _locationTracker.LocationUpdateFailed -= OnLocationUpdateFailed;
+        _locationTracker.LocationSent -= OnLocationSent;
     }
 }

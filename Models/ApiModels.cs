@@ -23,7 +23,28 @@ public enum RideStatus
 public sealed class DriverRideListItemDto
 {
     public required string Id { get; set; }
+    
+    /// <summary>
+    /// Legacy pickup time (deprecated - use PickupDateTimeOffset instead)
+    /// Kept for backward compatibility during transition period
+    /// </summary>
+    [Obsolete("Use PickupDateTimeOffset instead for correct timezone handling")]
     public DateTime PickupDateTime { get; set; }
+    
+    /// <summary>
+    /// Pickup time with explicit timezone offset
+    /// This is the correct property to use for display
+    /// </summary>
+    public DateTimeOffset? PickupDateTimeOffset { get; set; }
+    
+    /// <summary>
+    /// Helper property that returns the correct pickup time
+    /// Prefers PickupDateTimeOffset if available, falls back to PickupDateTime
+    /// </summary>
+    [JsonIgnore]
+    public DateTimeOffset DisplayPickupTime => 
+        PickupDateTimeOffset ?? new DateTimeOffset(PickupDateTime, TimeZoneInfo.Local.GetUtcOffset(PickupDateTime));
+    
     public required string PickupLocation { get; set; }
     public required string DropoffLocation { get; set; }
     public required string PassengerName { get; set; }
@@ -38,7 +59,28 @@ public sealed class DriverRideListItemDto
 public sealed class DriverRideDetailDto
 {
     public required string Id { get; set; }
+    
+    /// <summary>
+    /// Legacy pickup time (deprecated - use PickupDateTimeOffset instead)
+    /// Kept for backward compatibility during transition period
+    /// </summary>
+    [Obsolete("Use PickupDateTimeOffset instead for correct timezone handling")]
     public DateTime PickupDateTime { get; set; }
+    
+    /// <summary>
+    /// Pickup time with explicit timezone offset
+    /// This is the correct property to use for display
+    /// </summary>
+    public DateTimeOffset? PickupDateTimeOffset { get; set; }
+    
+    /// <summary>
+    /// Helper property that returns the correct pickup time
+    /// Prefers PickupDateTimeOffset if available, falls back to PickupDateTime
+    /// </summary>
+    [JsonIgnore]
+    public DateTimeOffset DisplayPickupTime => 
+        PickupDateTimeOffset ?? new DateTimeOffset(PickupDateTime, TimeZoneInfo.Local.GetUtcOffset(PickupDateTime));
+    
     public required string PickupLocation { get; set; }
     public string? PickupStyle { get; set; }
     public string? PickupSignText { get; set; }
@@ -92,6 +134,23 @@ public sealed class LocationUpdate
     public double Latitude { get; set; }
     public double Longitude { get; set; }
     public DateTime Timestamp { get; set; }
+    
+    /// <summary>
+    /// Direction of travel in degrees (0-360, where 0 is North)
+    /// Optional - may be null if device doesn't provide heading
+    /// </summary>
+    public double? Heading { get; set; }
+    
+    /// <summary>
+    /// Current speed in meters per second
+    /// Optional - may be null if device doesn't provide speed
+    /// </summary>
+    public double? Speed { get; set; }
+    
+    /// <summary>
+    /// Accuracy of the location reading in meters
+    /// </summary>
+    public double? Accuracy { get; set; }
 }
 
 /// <summary>
