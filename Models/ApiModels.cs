@@ -94,6 +94,46 @@ public sealed class DriverRideDetailDto
     public FlightInfo? OutboundFlight { get; set; }
     public string? AdditionalRequest { get; set; }
     public RideStatus Status { get; set; }
+
+    // ?? Future: Dispatcher-attached context ??????????????????????????????????
+    // When a dispatcher links a saved passenger or saved location record to a
+    // booking in the AdminPortal, the AdminAPI will populate one or more of the
+    // properties below on the booking detail response.  The driver app will
+    // display them automatically; no further model changes are needed at that
+    // time.
+
+    /// <summary>
+    /// Phone number sourced from the dispatcher's saved passenger record.
+    /// Present only when the dispatcher has linked a saved passenger to this
+    /// booking.  Complements (or may duplicate) PassengerPhone.
+    /// </summary>
+    public string? SavedPassengerPhone { get; set; }
+
+    /// <summary>
+    /// Email address sourced from the dispatcher's saved passenger record.
+    /// Present only when the dispatcher has linked a saved passenger.
+    /// </summary>
+    public string? SavedPassengerEmail { get; set; }
+
+    /// <summary>
+    /// Dispatcher-supplied notes attached to this booking
+    /// (e.g. gate instructions, customer preference notes).
+    /// </summary>
+    public string? DispatcherNotes { get; set; }
+
+    /// <summary>
+    /// Human-readable label for the pickup location sourced from a saved
+    /// location record (e.g. "ORD Terminal 1 – Door 4B").
+    /// Present only when the dispatcher has linked a saved location.
+    /// </summary>
+    public string? SavedPickupLocationLabel { get; set; }
+
+    /// <summary>
+    /// Human-readable label for the dropoff location sourced from a saved
+    /// location record (e.g. "Client HQ – Main Entrance").
+    /// Present only when the dispatcher has linked a saved location.
+    /// </summary>
+    public string? SavedDropoffLocationLabel { get; set; }
 }
 
 /// <summary>
