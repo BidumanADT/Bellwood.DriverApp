@@ -21,7 +21,7 @@ public static class AppSettings
     /// </summary>
     public static string AuthServerBaseUrl => IsDevelopment
         ? "https://10.0.2.2:5001"
-        : "https://auth.bellwoodglobal.com";
+        : "https://auth.elitebellwood.com";
 
     /// <summary>
     /// Base URL for AdminAPI (driver endpoints)
@@ -30,14 +30,14 @@ public static class AppSettings
     /// </summary>
     public static string AdminApiBaseUrl => IsDevelopment
         ? "https://10.0.2.2:5206"
-        : "https://adminapi.bellwoodglobal.com";
+        : "https://api.elitebellwood.com";
 
     /// <summary>
     /// Base URL for RidesAPI (future integration)
     /// </summary>
     public static string RidesApiBaseUrl => IsDevelopment
         ? "https://10.0.2.2:5005"
-        : "https://ridesapi.bellwoodglobal.com";
+        : "https://ridesapi.elitebellwood.com";
 
     /// <summary>
     /// Login endpoint on AuthServer

@@ -48,12 +48,16 @@ public static class MauiProgram
         // 1. Auth Server client (login)
         builder.Services.AddHttpClient("auth", c =>
         {
+#if DEBUG
 #if ANDROID
             c.BaseAddress = new Uri("https://10.0.2.2:5001");
 #elif IOS || MACCATALYST
             c.BaseAddress = new Uri("https://localhost:5001");
 #else
             c.BaseAddress = new Uri("https://localhost:5001");
+#endif
+#else
+            c.BaseAddress = new Uri("https://auth.elitebellwood.com");
 #endif
             c.DefaultRequestHeaders.Accept.Add(
                 new MediaTypeWithQualityHeaderValue("application/json"));
@@ -73,12 +77,16 @@ public static class MauiProgram
         // 2. AdminAPI client for driver endpoints (protected)
         builder.Services.AddHttpClient("driver-admin", c =>
         {
+#if DEBUG
 #if ANDROID
             c.BaseAddress = new Uri("https://10.0.2.2:5206");
 #elif IOS || MACCATALYST
             c.BaseAddress = new Uri("https://localhost:5206");
 #else
             c.BaseAddress = new Uri("https://localhost:5206");
+#endif
+#else
+            c.BaseAddress = new Uri("https://api.elitebellwood.com");
 #endif
             c.DefaultRequestHeaders.Accept.Add(
                 new MediaTypeWithQualityHeaderValue("application/json"));
