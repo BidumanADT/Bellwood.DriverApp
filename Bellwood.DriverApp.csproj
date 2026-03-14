@@ -31,9 +31,15 @@
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">6.5</SupportedOSPlatformVersion>
 	</PropertyGroup>
 
+	<!-- Android Debug - no keystore signing needed for emulator -->
+	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Debug|net8.0-android|AnyCPU'">
+	  <AndroidKeyStore>false</AndroidKeyStore>
+	</PropertyGroup>
+
 	<!-- Android Release Signing - values passed via dotnet publish -p: or CI environment -->
 	<PropertyGroup Condition="'$(Configuration)|$(TargetFramework)|$(Platform)'=='Release|net8.0-android|AnyCPU'">
-	  <AndroidKeyStore>true</AndroidKeyStore>
+	  <AndroidKeyStore Condition="'$(AndroidSigningKeyStore)' != ''">true</AndroidKeyStore>
+	  <AndroidKeyStore Condition="'$(AndroidSigningKeyStore)' == ''">false</AndroidKeyStore>
 	  <AndroidSigningKeyStore>$(AndroidSigningKeyStore)</AndroidSigningKeyStore>
 	  <AndroidSigningStorePass>$(AndroidSigningStorePass)</AndroidSigningStorePass>
 	  <AndroidSigningKeyAlias>$(AndroidSigningKeyAlias)</AndroidSigningKeyAlias>
