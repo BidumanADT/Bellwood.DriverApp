@@ -2,12 +2,17 @@ using Bellwood.DriverApp.Models;
 using Bellwood.DriverApp.Helpers;
 using System.Collections.Concurrent;
 using System.Net.Http.Json;
+#if ANDROID
+using Android.Content;
+#endif
 
 namespace Bellwood.DriverApp.Services;
 
 /// <summary>
 /// Implementation of location tracking using MAUI Geolocation and periodic timers.
 /// Supports dynamic interval adjustment, retry logic, and background tracking.
+/// On Android, a foreground service (LocationForegroundService) is started when the
+/// first tracking session opens and stopped when the last session closes.
 /// </summary>
 public class LocationTracker : ILocationTracker
 {
@@ -80,6 +85,14 @@ public class LocationTracker : ILocationTracker
         // Start the tracking loop and store the task reference
         session.TrackingTask = Task.Run(async () => await TrackLocationLoopAsync(session), session.Cts.Token);
 
+#if ANDROID
+        // Start the Android foreground service so the OS keeps this process alive
+        // while at least one tracking session is active.
+        var context = Android.App.Application.Context;
+        var intent = LocationForegroundService.CreateStartIntent(context, rideId);
+        context.StartForegroundService(intent);
+#endif
+
         return true;
     }
 
@@ -126,6 +139,18 @@ public class LocationTracker : ILocationTracker
             }
 
             RaiseTrackingStatusChanged(rideId, oldStatus, TrackingStatus.Inactive, "Tracking stopped");
+
+#if ANDROID
+            // Only stop the foreground service when ALL sessions have ended.
+            // A driver could theoretically have two rides active simultaneously;
+            // the service must stay alive until the dictionary is truly empty.
+            if (_activeSessions.IsEmpty)
+            {
+                var context = Android.App.Application.Context;
+                var intent = LocationForegroundService.CreateStopIntent(context);
+                context.StopService(intent);
+            }
+#endif
         }
     }
 
