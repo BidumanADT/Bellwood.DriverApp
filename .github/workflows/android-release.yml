@@ -7,9 +7,9 @@ on:
       - "v*"
 
 env:
-  DOTNET_VERSION: "8.0.x"
+  DOTNET_VERSION: "9.0.x"
   PROJECT_PATH: Bellwood.DriverApp.csproj
-  TARGET_FRAMEWORK: net8.0-android
+  TARGET_FRAMEWORK: net9.0-android
 
 jobs:
   build-android:
