@@ -182,10 +182,11 @@
                                FontAttributes="Bold"
                                TextColor="{StaticResource Primary}"
                                IsVisible="{Binding Ride.SavedDropoffLocationLabel, Converter={StaticResource IsNotNullConverter}}"/>
-                        <Label Text="{Binding Ride.DropoffLocation}"
+                        <Label Text="{Binding Ride.DropoffLocation, TargetNullValue='As Directed'}"
                                FontSize="16"/>
                         <Button Text="Navigate to Drop Off"
                                 Command="{Binding NavigateToDropoffCommand}"
+                                IsVisible="{Binding Ride.DropoffLocation, Converter={StaticResource IsNotNullConverter}}"
                                 BackgroundColor="{StaticResource Primary}"
                                 TextColor="White"
                                 CornerRadius="8"

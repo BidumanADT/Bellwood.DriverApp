@@ -13,29 +13,24 @@ public class RideService : IRideService
 
     public RideService(IHttpClientFactory httpClientFactory)
     {
-        // Use the "driver-admin" client – base address and dev-cert override are set in MauiProgram
+        // Use the "driver-admin" client ï¿½ base address and dev-cert override are set in MauiProgram
         _httpClient = httpClientFactory.CreateClient("driver-admin");
     }
 
     public async Task<List<DriverRideListItemDto>> GetTodaysRidesAsync()
     {
-        try
+        var response = await _httpClient.GetAsync("/driver/rides/today");
+        if (!response.IsSuccessStatusCode)
         {
-            var response = await _httpClient.GetAsync("/driver/rides/today");
-            if (!response.IsSuccessStatusCode)
-            {
-                Console.WriteLine($"Failed to fetch rides: {response.StatusCode}");
-                return new List<DriverRideListItemDto>();
-            }
+            var body = await response.Content.ReadAsStringAsync();
+            throw new HttpRequestException(
+                $"Failed to load rides ({(int)response.StatusCode}): {body}",
+                null,
+                response.StatusCode);
+        }
 
-            var rides = await response.Content.ReadFromJsonAsync<List<DriverRideListItemDto>>();
-            return rides ?? new List<DriverRideListItemDto>();
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error fetching rides: {ex.Message}");
-            return new List<DriverRideListItemDto>();
-        }
+        var rides = await response.Content.ReadFromJsonAsync<List<DriverRideListItemDto>>();
+        return rides ?? new List<DriverRideListItemDto>();
     }
 
     public async Task<DriverRideDetailDto?> GetRideDetailsAsync(string rideId)

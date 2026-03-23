@@ -94,7 +94,7 @@
                                 <HorizontalStackLayout Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2"
                                                       Spacing="5">
                                     <Label Text="🏁" FontSize="14"/>
-                                    <Label Text="{Binding DropoffLocation}"
+                                    <Label Text="{Binding DropoffLocation, TargetNullValue='As Directed'}"
                                            FontSize="14"
                                            TextColor="{StaticResource Gray600}"/>
                                 </HorizontalStackLayout>

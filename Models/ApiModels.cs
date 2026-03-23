@@ -46,7 +46,7 @@ public sealed class DriverRideListItemDto
         PickupDateTimeOffset ?? new DateTimeOffset(PickupDateTime, TimeZoneInfo.Local.GetUtcOffset(PickupDateTime));
     
     public required string PickupLocation { get; set; }
-    public required string DropoffLocation { get; set; }
+    public string? DropoffLocation { get; set; }
     public required string PassengerName { get; set; }
     public string? PassengerPhone { get; set; }
     public RideStatus Status { get; set; }
@@ -84,7 +84,7 @@ public sealed class DriverRideDetailDto
     public required string PickupLocation { get; set; }
     public string? PickupStyle { get; set; }
     public string? PickupSignText { get; set; }
-    public required string DropoffLocation { get; set; }
+    public string? DropoffLocation { get; set; }
     public required string PassengerName { get; set; }
     public string? PassengerPhone { get; set; }
     public int PassengerCount { get; set; }
@@ -123,14 +123,14 @@ public sealed class DriverRideDetailDto
 
     /// <summary>
     /// Human-readable label for the pickup location sourced from a saved
-    /// location record (e.g. "ORD Terminal 1 – Door 4B").
+    /// location record (e.g. "ORD Terminal 1 ï¿½ Door 4B").
     /// Present only when the dispatcher has linked a saved location.
     /// </summary>
     public string? SavedPickupLocationLabel { get; set; }
 
     /// <summary>
     /// Human-readable label for the dropoff location sourced from a saved
-    /// location record (e.g. "Client HQ – Main Entrance").
+    /// location record (e.g. "Client HQ ï¿½ Main Entrance").
     /// Present only when the dispatcher has linked a saved location.
     /// </summary>
     public string? SavedDropoffLocationLabel { get; set; }
