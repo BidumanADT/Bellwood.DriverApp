@@ -35,22 +35,20 @@ public class RideService : IRideService
 
     public async Task<DriverRideDetailDto?> GetRideDetailsAsync(string rideId)
     {
-        try
+        var response = await _httpClient.GetAsync($"/driver/rides/{rideId}");
+        if (!response.IsSuccessStatusCode)
         {
-            var response = await _httpClient.GetAsync($"/driver/rides/{rideId}");
-            if (!response.IsSuccessStatusCode)
-            {
-                Console.WriteLine($"Failed to fetch ride details: {response.StatusCode}");
-                return null;
-            }
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                return null; // Caller shows "Ride not found"
 
-            return await response.Content.ReadFromJsonAsync<DriverRideDetailDto>();
+            var body = await response.Content.ReadAsStringAsync();
+            throw new HttpRequestException(
+                $"Failed to load ride details ({(int)response.StatusCode}): {body}",
+                null,
+                response.StatusCode);
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error fetching ride details: {ex.Message}");
-            return null;
-        }
+
+        return await response.Content.ReadFromJsonAsync<DriverRideDetailDto>();
     }
 
     public async Task<(bool Success, string? ErrorMessage)> UpdateRideStatusAsync(string rideId, RideStatus newStatus)
