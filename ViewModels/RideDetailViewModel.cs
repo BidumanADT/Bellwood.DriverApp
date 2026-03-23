@@ -200,12 +200,15 @@ public partial class RideDetailViewModel : BaseViewModel
 
         try
         {
-            string targetAddress = Ride.Status switch
+            string? targetAddress = Ride.Status switch
             {
                 RideStatus.OnRoute or RideStatus.Arrived => Ride.PickupLocation,
                 RideStatus.PassengerOnboard => Ride.DropoffLocation,
                 _ => Ride.PickupLocation
             };
+
+            if (string.IsNullOrEmpty(targetAddress))
+                return (null, null);
 
             // Try to geocode the address to get coordinates
             var locations = await Geocoding.GetLocationsAsync(targetAddress);
