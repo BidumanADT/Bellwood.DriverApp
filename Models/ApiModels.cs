@@ -38,13 +38,12 @@ public sealed class DriverRideListItemDto
     public DateTimeOffset? PickupDateTimeOffset { get; set; }
     
     /// <summary>
-    /// Helper property that returns the correct pickup time
-    /// Prefers PickupDateTimeOffset if available, falls back to PickupDateTime
+    /// Pickup time in the driver's local timezone, ready for display.
+    /// PickupDateTimeOffset is always populated by the server (3D).
     /// </summary>
     [JsonIgnore]
-    public DateTimeOffset DisplayPickupTime => 
-        PickupDateTimeOffset ?? new DateTimeOffset(PickupDateTime, TimeZoneInfo.Local.GetUtcOffset(PickupDateTime));
-    
+    public DateTimeOffset DisplayPickupTime => PickupDateTimeOffset!.Value;
+
     public required string PickupLocation { get; set; }
     public string? DropoffLocation { get; set; }
     public required string PassengerName { get; set; }
@@ -74,13 +73,12 @@ public sealed class DriverRideDetailDto
     public DateTimeOffset? PickupDateTimeOffset { get; set; }
     
     /// <summary>
-    /// Helper property that returns the correct pickup time
-    /// Prefers PickupDateTimeOffset if available, falls back to PickupDateTime
+    /// Pickup time in the driver's local timezone, ready for display.
+    /// PickupDateTimeOffset is always populated by the server (3D).
     /// </summary>
     [JsonIgnore]
-    public DateTimeOffset DisplayPickupTime => 
-        PickupDateTimeOffset ?? new DateTimeOffset(PickupDateTime, TimeZoneInfo.Local.GetUtcOffset(PickupDateTime));
-    
+    public DateTimeOffset DisplayPickupTime => PickupDateTimeOffset!.Value;
+
     public required string PickupLocation { get; set; }
     public string? PickupStyle { get; set; }
     public string? PickupSignText { get; set; }
