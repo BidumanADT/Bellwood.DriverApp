@@ -85,7 +85,8 @@
                 <VerticalStackLayout Spacing="10">
                     <Label Text="Passenger Information"
                            FontSize="18"
-                           FontAttributes="Bold"/>
+                           FontAttributes="Bold"
+                           TextColor="{StaticResource Gray900}"/>
                     
                     <HorizontalStackLayout Spacing="10">
                         <Label Text="👤" FontSize="16"/>
@@ -135,7 +136,8 @@
                 <VerticalStackLayout Spacing="15">
                     <Label Text="Locations"
                            FontSize="18"
-                           FontAttributes="Bold"/>
+                           FontAttributes="Bold"
+                           TextColor="{StaticResource Gray900}"/>
 
                     <!-- Pickup -->
                     <VerticalStackLayout Spacing="5">
@@ -150,7 +152,8 @@
                                TextColor="{StaticResource Primary}"
                                IsVisible="{Binding Ride.SavedPickupLocationLabel, Converter={StaticResource IsNotNullConverter}}"/>
                         <Label Text="{Binding Ride.PickupLocation}"
-                               FontSize="16"/>
+                               FontSize="16"
+                               TextColor="{StaticResource Gray900}"/>
                         <Label Text="{Binding Ride.PickupStyle}"
                                FontSize="14"
                                TextColor="{StaticResource Gray600}"
@@ -183,7 +186,8 @@
                                TextColor="{StaticResource Primary}"
                                IsVisible="{Binding Ride.SavedDropoffLocationLabel, Converter={StaticResource IsNotNullConverter}}"/>
                         <Label Text="{Binding Ride.DropoffLocation, TargetNullValue='As Directed'}"
-                               FontSize="16"/>
+                               FontSize="16"
+                               TextColor="{StaticResource Gray900}"/>
                         <Button Text="Navigate to Drop Off"
                                 Command="{Binding NavigateToDropoffCommand}"
                                 IsVisible="{Binding Ride.DropoffLocation, Converter={StaticResource IsNotNullConverter}}"
@@ -200,26 +204,32 @@
                 <VerticalStackLayout Spacing="10">
                     <Label Text="Ride Details"
                            FontSize="18"
-                           FontAttributes="Bold"/>
+                           FontAttributes="Bold"
+                           TextColor="{StaticResource Gray900}"/>
 
                     <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" RowSpacing="8" ColumnSpacing="10">
                         <Label Grid.Row="0" Grid.Column="0"
                                Text="{Binding Ride.VehicleClass, StringFormat='🚗 {0}'}"
-                               FontSize="14"/>
+                               FontSize="14"
+                               TextColor="{StaticResource Gray900}"/>
                         <Label Grid.Row="0" Grid.Column="1"
                                Text="{Binding Ride.PassengerCount, StringFormat='👥 {0} passenger(s)'}"
-                               FontSize="14"/>
+                               FontSize="14"
+                               TextColor="{StaticResource Gray900}"/>
                         <Label Grid.Row="1" Grid.Column="0"
                                Text="{Binding Ride.CheckedBags, StringFormat='🧳 {0} checked bag(s)'}"
-                               FontSize="14"/>
+                               FontSize="14"
+                               TextColor="{StaticResource Gray900}"/>
                         <Label Grid.Row="1" Grid.Column="1"
                                Text="{Binding Ride.CarryOnBags, StringFormat='🎒 {0} carry-on(s)'}"
-                               FontSize="14"/>
+                               FontSize="14"
+                               TextColor="{StaticResource Gray900}"/>
                     </Grid>
 
                     <!-- Flight Info -->
                     <Label Text="{Binding Ride.OutboundFlight.FlightNumber, StringFormat='✈️ Flight: {0}'}"
                            FontSize="14"
+                           TextColor="{StaticResource Gray900}"
                            IsVisible="{Binding Ride.OutboundFlight.FlightNumber, Converter={StaticResource IsNotNullConverter}}"/>
 
                     <!-- Special Requests -->
